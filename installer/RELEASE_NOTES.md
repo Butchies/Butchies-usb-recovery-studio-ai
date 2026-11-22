@@ -1,7 +1,4 @@
 ## Neu in dieser Version
-- Erster Windows-Installer von Butchies USB Recovery Studio AI
-- Blau-weiße Oberfläche mit Übersicht, Diagnose, Datenrettung, Reparatur, KI-Live-Monitor, Protokollen und Wissensbasis
-- Eigenes App-Icon
-- Trainiertes Symptom-Modell für schnellere Fehlererkennung (83 % Treffer in der Kreuzvalidierung), lernt aus jeder bestätigten Diagnose
-
-Hinweis: Das Programm braucht Administratorrechte (direkter Zugriff auf den Stick). Es ist ein Vorab-Build und noch nicht mit vielen echten Sticks getestet.
+- KI-Live-Monitor: Fortschrittsleiste für Reparatur-Abläufe – Gesamtfortschritt in Prozent, „Schritt x von y“, Laufzeit, was gerade passiert, Zeitleiste aller Schritte mit Status
+- Bewerten, ob die KI richtig liegt: Befund bestätigen oder verwerfen, „Das ist es“ bei jeder Hypothese, „Keine davon trifft zu“ und nach jedem Ablauf „Hat es geholfen?“ – mit sichtbarer Rückmeldung; das Modell trainiert sofort nach
+- Reparatur-Seite: lange Texte werden jetzt sauber umbrochen
