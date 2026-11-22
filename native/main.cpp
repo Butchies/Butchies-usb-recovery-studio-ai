@@ -62,6 +62,7 @@ public:
         QDir().mkpath(m_work);
         m_kb.load(s(m_work + "/wissensbasis.txt"));
         m_agent = std::make_unique<RecoveryAgent>(m_kb, s(QDir::toNativeSeparators(m_work)));
+        m_modelAccuracy = int(m_agent->model().crossValidate() * 100 + 0.5);
         QSettings st;
         m_target = st.value("targetDir").toString();
         m_fs = st.value("formatFs", "exfat").toString();
@@ -73,6 +74,7 @@ public:
         log(LogKind::Info, fmt("Startwissen: %zu Controller-Kennungen, %zu Windows-Ereignisse, %zu Kernel-Muster.",
                                controllerHints().size(), eventCatalog().size(), kernelPatterns().size()));
         updateKnowledge();
+        log(LogKind::Lernen, m_agent->modelSummary());
         QTimer::singleShot(200, this, [this] { refresh(); });
         // Neue Sticks automatisch bemerken
         connect(&m_poll, &QTimer::timeout, this, [this] { if (!m_busy) refresh(true); });
@@ -102,7 +104,8 @@ public:
         for (int i = int(r.size()) - 1, n = 0; i >= 0 && n < 40; --i, ++n)
             recent << QVariantMap{{"kind", r[size_t(i)].kind == 'A' ? "Versuch" : "Diagnose"}, {"time", q(r[size_t(i)].ts)}, {"device", q(r[size_t(i)].id)},
                                   {"what", q(r[size_t(i)].what)}, {"symptoms", q(r[size_t(i)].symptoms)}, {"ok", r[size_t(i)].value == 1}};
-        return {{"actions", k.actions}, {"successes", k.successes}, {"diagnoses", k.diagnoses}, {"devices", k.devices},
+        return {{"modelAccuracy", m_modelAccuracy}, {"modelExamples", int(m_agent->model().trainingSize())}, {"modelConfirmed", int(m_agent->model().confirmedCases())},
+                {"actions", k.actions}, {"successes", k.successes}, {"diagnoses", k.diagnoses}, {"devices", k.devices},
                 {"controllers", int(controllerHints().size())}, {"recent", recent}, {"path", m_work + "/wissensbasis.txt"}};
     }
     QVariantMap approval() const { return m_approval; }
@@ -346,6 +349,8 @@ private:
             logs << QVariantMap{{"time", q(e.time)}, {"source", q(e.source)}, {"id", e.id}, {"category", q(e.category)}, {"weight", e.weight},
                                 {"meaning", q(e.meaning)}, {"raw", q(e.raw)}, {"matched", e.matched}};
         for (auto &x : d.facts) facts << q(x);
+        QVariantList model;
+        for (size_t i = 0; i < d.model.size() && i < 3; ++i) model << QVariantMap{{"title", hypothesisTitleShort(d.model[i].label)}, {"p", int(d.model[i].p * 100 + 0.5)}};
         const Hypothesis *t = d.top();
         QVariantList curve; if (f.scan) for (double v : f.scan->speedCurve) curve << v;
         return {{"valid", t != nullptr}, {"headline", q(d.headline)}, {"topId", t ? q(t->id) : QString()}, {"confidence", t ? int(t->confidence * 100 + 0.5) : 0},
@@ -353,7 +358,7 @@ private:
                 {"repair", t ? q(t->repair) : QString()}, {"repairable", d.repairable}, {"hypotheses", hyps}, {"plan", plan}, {"logs", logs}, {"facts", facts},
                 {"symptoms", q(d.symptoms)}, {"imageAvailable", f.imageAvailable}, {"imagePath", q(f.imagePath)},
                 {"fake", f.capacity && f.capacity->fake}, {"realSize", f.capacity ? q(humanSize(f.capacity->real)) : QString()}, {"speedCurve", curve},
-                {"device", q(f.dev.displayName())}, {"deviceId", q(f.dev.idString())}};
+                {"device", q(f.dev.displayName())}, {"deviceId", q(f.dev.idString())}, {"model", model}};
     }
 
     QString contextText() const {
@@ -404,6 +409,7 @@ private:
     QVariantList m_devList, m_monitor, m_chat;
     QVariantMap m_diag, m_approval, m_knowledge;
     int m_selected = -1;
+    int m_modelAccuracy = 0;
     bool m_busy = false, m_empty = false;
     double m_progress = 0;
     uint64_t m_lastProg = 0;

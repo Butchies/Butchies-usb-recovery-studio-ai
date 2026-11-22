@@ -198,7 +198,7 @@ inline void findFromBackups(BlockReader &r, uint64_t from, LayoutReport &rep, Pr
     }
 }
 
-inline LayoutReport analyzeLayout(BlockReader &r, ProgressFn progress = {}, CancelToken *cancel = nullptr) {
+inline LayoutReport analyzeLayout(BlockReader &r, ProgressFn progress = {}, CancelToken *cancel = nullptr, bool deep = true) {
     LayoutReport rep;
     std::vector<uint8_t> s0;
     std::string err;
@@ -279,7 +279,10 @@ inline LayoutReport analyzeLayout(BlockReader &r, ProgressFn progress = {}, Canc
             if (diskBytes && v.offset + v.sizeBytes > diskBytes + 512) { rep.beyondEnd = true; rep.issues.push_back("Dateisystem ist größer als der Datenträger meldet – Hinweis auf Fake-Kapazität oder falsch gemeldete Größe"); }
         }
     }
-    findFromBackups(r, 0, rep, progress, cancel);
+    // Tiefensuche nur, wenn etwas nicht stimmt (spart bei gesunden Sticks mehrere Sekunden)
+    bool allValid = !rep.volumes.empty() && !rep.tableDamaged && !rep.fsDamaged;
+    for (auto &v : rep.volumes) if (!v.primaryValid) allValid = false;
+    if (deep || !allValid) findFromBackups(r, 0, rep, progress, cancel);
     for (auto &f : rep.found) {
         if (!f.primaryValid && f.backupValid) rep.fsRepairableFromBackup = true;
         rep.facts.push_back(fmt("Gefunden: %s bei %s (%s)%s", fsName(f.type), humanSize(f.offset).c_str(), humanSize(f.sizeBytes).c_str(), f.primaryValid ? "" : " – nur Sicherung intakt"));

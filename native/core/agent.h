@@ -8,6 +8,7 @@
 #include "repair_actions.h"
 #include "capacity_test.h"
 #include <ctime>
+#include <future>
 
 namespace usbr {
 
@@ -31,7 +32,13 @@ struct StepOutcome { std::string action; bool executed = false, ok = false, impr
 
 class RecoveryAgent {
 public:
-    RecoveryAgent(KnowledgeStore &kb, std::string workDir) : kb_(kb), work_(std::move(workDir)) {}
+    RecoveryAgent(KnowledgeStore &kb, std::string workDir) : kb_(kb), work_(std::move(workDir)) { model_.train(&kb_); }
+
+    const SymptomModel &model() const { return model_; }
+    std::string modelSummary() const {
+        return fmt("Trainiertes Symptom-Modell: %zu Fehlerbilder, %zu Trainingsbeispiele (%zu Grundfälle mit Variationen, %zu von dir bestätigte Fälle), Treffergenauigkeit %d %% (Kreuzvalidierung)",
+                   model_.classes(), model_.trainingSize(), model_.builtinCases(), model_.confirmedCases(), int(model_.crossValidate() * 100 + 0.5));
+    }
 
     const DeviceFacts &facts() const { return facts_; }
     const Diagnosis &diagnosis() const { return diag_; }
@@ -44,6 +51,10 @@ public:
         f.imagePath = f.imageAvailable ? facts_.imagePath : std::string();
         if (sameDevice(facts_.dev, dev)) { f.scan = facts_.scan; f.capacity = facts_.capacity; f.writeTest = facts_.writeTest; if (!withLogs) f.logs = facts_.logs; }
         auto L = [&](LogKind k, const std::string &s) { if (cb.log) cb.log(k, s); };
+        const uint64_t t0 = nowMs();
+        // Protokolle parallel auslesen – das ist der langsamste Teil und braucht den Stick nicht
+        std::future<LogReport> logsFuture;
+        if (withLogs) logsFuture = std::async(std::launch::async, [dev] { return collectLogs(dev); });
         f.host = readHostPolicy();
         if (dev.hasVidPid) f.controller = findController(dev.vid, dev.pid);
         L(LogKind::Messung, "Gerät: " + dev.displayName() + " · " + dev.idString() + (dev.isDisk ? " · " + (dev.mediaPresent ? humanSize(dev.size) : std::string("kein Medium")) : " · kein Datenträger"));
@@ -59,23 +70,34 @@ public:
             if (f.scsi.writeProtectBit >= 0) L(LogKind::Messung, std::string("MODE SENSE: Schreibschutzbit ") + (f.scsi.writeProtectBit ? "GESETZT" : "nicht gesetzt"));
             if (!f.scsi.unitReady) L(LogKind::Messung, "TEST UNIT READY: " + (f.scsi.readySense.empty() ? std::string("keine Antwort") : f.scsi.readySense));
         }
+        {   // Sofort-Einschätzung des trainierten Modells aus Kennung, Status und Controller-Antworten
+            const std::string early = symptomKey(f);
+            auto pr = model_.predict(early);
+            if (early.empty()) L(LogKind::Hypothese, "Sofort-Einschätzung: Kennung und Controller-Antworten unauffällig – Messungen entscheiden");
+            else if (!pr.empty()) L(LogKind::Hypothese, fmt("Sofort-Einschätzung nach %llu ms: %s (%d %%) – wird jetzt mit Messungen geprüft",
+                                                      (unsigned long long)(nowMs() - t0), hypothesisTitleShort(pr[0].label), int(pr[0].p * 100 + 0.5)));
+        }
         if (dev.isDisk && dev.mediaPresent && !dev.path.empty()) {
             RawDisk d; std::string e;
             if (d.open(dev.path, false, e)) {
                 if (cb.progress) cb.progress(30, "Lese-Probe über den ganzen Stick");
-                f.probe = quickProbe(d, 64, cancel);
+                f.probe = quickProbe(d, 24, cancel);
+                if (f.probe.errors || f.probe.timeouts) {
+                    L(LogKind::Entscheidung, "Lesefehler in der Schnellprobe – prüfe genauer (64 Stichproben)");
+                    f.probe = quickProbe(d, 64, cancel);
+                }
                 L(LogKind::Messung, fmt("Lese-Probe: %d/%d lesbar, %d Fehler, %d Zeitüberschreitungen, Ø %u ms", f.probe.ok, f.probe.samples, f.probe.errors, f.probe.timeouts, f.probe.avgMs));
                 if (f.probe.ok && f.probe.zeros + f.probe.ones == f.probe.ok) L(LogKind::Messung, "Alle lesbaren Stichproben sind leer (00/FF)");
                 if (cb.progress) cb.progress(50, "Partition und Dateisystem prüfen");
                 BlockReader r(d, 3000);
-                f.layout = analyzeLayout(r, [&](double p, const std::string &t) { if (cb.progress) cb.progress(50 + p * 0.3, t); }, cancel);
+                f.layout = analyzeLayout(r, [&](double p, const std::string &t) { if (cb.progress) cb.progress(50 + p * 0.3, t); }, cancel, false);
                 for (auto &x : f.layout.facts) L(LogKind::Messung, x);
                 for (auto &x : f.layout.issues) L(LogKind::Messung, "Auffällig: " + x);
             } else { f.probe.openError = e; L(LogKind::Fehler, "Öffnen nicht möglich: " + e); }
         }
         if (withLogs) {
             if (cb.progress) cb.progress(85, "Protokolle auslesen");
-            f.logs = collectLogs(dev);
+            f.logs = logsFuture.get();
             int matched = 0; for (auto &e : f.logs.entries) matched += e.matched;
             L(LogKind::Messung, fmt("Protokolle: %zu relevante Einträge (%d eindeutig diesem Stick zugeordnet)", f.logs.entries.size(), matched));
             int shown = 0;
@@ -83,13 +105,14 @@ public:
             for (auto &n : f.logs.notes) L(LogKind::Info, n);
         }
         if (cb.progress) cb.progress(100, "Messung abgeschlossen");
+        L(LogKind::Info, fmt("Messungen abgeschlossen in %.1f s", double(nowMs() - t0) / 1000.0));
         return f;
     }
 
     Diagnosis diagnose(const UsbDevice &dev, const AgentCallbacks &cb, CancelToken *cancel, bool withLogs = true) {
         if (!sameDevice(facts_.dev, dev)) { facts_ = DeviceFacts{}; caseDir_.clear(); }
         facts_ = collect(dev, withLogs, cb, cancel);
-        DiagnosisEngine eng(&kb_);
+        DiagnosisEngine eng(&kb_, &model_);
         diag_ = eng.evaluate(facts_, cb.log);
         if (cb.log && diag_.top()) cb.log(LogKind::Entscheidung, fmt("Befund: %s (Sicherheit %d %%)", diag_.top()->title.c_str(), int(diag_.top()->confidence * 100 + 0.5)));
         if (cb.diagnosisChanged) cb.diagnosisChanged(diag_, facts_);
@@ -98,6 +121,7 @@ public:
 
     void confirm(const std::string &hypId, bool correct, const AgentCallbacks &cb) {
         kb_.recordDiagnosis(facts_.dev.idString(), family(), diag_.symptoms, hypId, correct);
+        model_.train(&kb_);   // sofort nachtrainieren
         if (cb.log) cb.log(LogKind::Lernen, std::string("Diagnose „") + hypId + (correct ? "“ bestätigt – wird bei ähnlichen Sticks stärker gewichtet" : "“ verworfen – wird bei ähnlichen Sticks schwächer gewichtet"));
     }
 
@@ -235,7 +259,7 @@ public:
         f.imageAvailable = facts_.imageAvailable; f.imagePath = facts_.imagePath;
         f.capacity = facts_.capacity; f.scan = facts_.scan; f.writeTest = facts_.writeTest;
         facts_ = f;
-        DiagnosisEngine eng(&kb_);
+        DiagnosisEngine eng(&kb_, &model_);
         diag_ = eng.evaluate(facts_, cb.log);
         if (cb.diagnosisChanged) cb.diagnosisChanged(diag_, facts_);
         const Hypothesis *t = diag_.top();
@@ -302,7 +326,7 @@ private:
         std::error_code ec; std::filesystem::create_directories(u8path(caseDir_), ec);
     }
     void rediagnose(const AgentCallbacks &cb) {
-        DiagnosisEngine eng(&kb_); diag_ = eng.evaluate(facts_, cb.log);
+        DiagnosisEngine eng(&kb_, &model_); diag_ = eng.evaluate(facts_, cb.log);
         if (cb.diagnosisChanged) cb.diagnosisChanged(diag_, facts_);
     }
     UsbDevice refind(const UsbDevice &old) {
@@ -341,6 +365,7 @@ private:
     std::string work_, caseDir_, curTitle_;
     DeviceFacts facts_;
     Diagnosis diag_;
+    SymptomModel model_;
 };
 
 } // namespace usbr

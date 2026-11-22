@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Vorschau – Butchies USB Recovery Studio AI</title>
+<style>
+@font-face { font-family: Inter; src: url(../native/fonts/Inter-Regular.otf); font-weight: 400; }
+@font-face { font-family: Inter; src: url(../native/fonts/Inter-SemiBold.otf); font-weight: 600; }
+@font-face { font-family: Inter; src: url(../native/fonts/Inter-Bold.otf); font-weight: 700; }
+:root { --bg:#f3f7fd; --line:#e3ebf7; --text:#1e293b; --strong:#0b1b3f; --muted:#64748b; --blue:#1d4ed8; --blue2:#2563eb; --sky:#3b82f6;
+        --soft:#eaf1ff; --softer:#f5f8ff; --blueText:#1e40af; --good:#16a34a; --goodSoft:#e7f7ee; --warn:#d97706; --warnSoft:#fff4e0; --bad:#dc2626; --badSoft:#fdecec; }
+* { box-sizing: border-box; margin: 0; }
+body { font-family: Inter, "Segoe UI", sans-serif; font-size: 14px; color: var(--text); background: var(--bg); width: 1480px; height: 920px; overflow: hidden; display: flex; }
+.side { width: 248px; background: linear-gradient(#1e40af, #1e3a8a); padding: 14px; display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden; }
+.side::after { content: ""; position: absolute; width: 300px; height: 300px; border-radius: 50%; left: -120px; bottom: -80px; background: #fff; opacity: .05; }
+.brand { display: flex; align-items: center; gap: 10px; margin: 6px 6px 22px; color: #fff; }
+.brand img { width: 42px; height: 42px; }
+.brand b { font-size: 17px; display: block; } .brand span { font-size: 12px; color: #bfdbfe; }
+.nav { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 10px 0 14px; border-radius: 12px; color: #fff; }
+.nav img { width: 18px; height: 18px; filter: brightness(0) invert(1); }
+.nav.active { background: #fff; color: var(--blue); font-weight: 700; } .nav.active img { filter: none; }
+.nav .badge { margin-left: auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: #ffffff33; }
+.nav.active .badge { background: var(--soft); }
+.sel { margin-top: auto; border-radius: 14px; background: #ffffff1a; border: 1px solid #ffffff33; padding: 12px; color: #fff; position: relative; z-index: 1; }
+.sel small { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #bfdbfe; } .sel b { display: block; margin: 3px 0; } .sel .s { font-size: 12px; color: #dbeafe; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 4px; margin-right: 6px; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.top { height: 76px; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 22px 0 26px; }
+.top h1 { font-size: 22px; color: var(--strong); } .top p { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.ai { margin-left: auto; background: var(--soft); color: var(--blueText); font-weight: 700; font-size: 13px; border-radius: 99px; padding: 6px 14px; }
+.prog { margin-left: auto; width: 380px; } .prog .row { display: flex; font-weight: 700; color: var(--strong); } .prog .row span { margin-left: auto; color: var(--blue2); }
+.prog small { color: var(--muted); font-size: 12px; }
+.content { flex: 1; overflow: hidden; min-height: 0; padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; }
+.card { flex: none; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 4px 0 rgba(11,27,63,.04); }
+.hero { border-radius: 22px; padding: 26px; color: #fff; background: linear-gradient(90deg, #1d4ed8, #3b82f6); position: relative; overflow: hidden; height: 214px; display: flex; flex-direction: column; }
+.hero::before { content: ""; position: absolute; width: 280px; height: 280px; border-radius: 50%; right: -80px; top: -90px; background: #fff; opacity: .08; }
+.hero h2 { font-size: 24px; max-width: 680px; } .hero p { color: #dbeafe; margin-top: 8px; }
+.hero .logo { position: absolute; right: 30px; top: 18px; width: 92px; }
+.steps { margin-top: auto; display: flex; align-items: flex-start; }
+.step { text-align: center; width: 90px; } .step i { display: grid; place-items: center; margin: 0 auto 6px; width: 40px; height: 40px; border-radius: 20px; background: #ffffff26; font-style: normal; font-weight: 700; font-size: 16px; }
+.step.done i, .step.cur i { background: #fff; color: var(--blue); } .step.cur i { box-shadow: 0 0 0 4px #bfdbfe; } .step.cur { font-weight: 700; }
+.steps .ln { flex: 1; height: 2px; background: #ffffff55; margin-top: 20px; }
+.tiles { display: flex; gap: 16px; flex: none; } .tile { flex: 1; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 16px; height: 126px; }
+.tile .h { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.ic { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: var(--soft); } .ic img { width: 15px; height: 15px; }
+.tile .v { font-size: 22px; font-weight: 700; color: var(--strong); margin: 6px 0 3px; } .tile .n { color: var(--muted); font-size: 12px; }
+.bar { height: 8px; border-radius: 4px; background: #e8eef9; margin-top: 8px; } .bar div { height: 100%; border-radius: 4px; background: var(--blue2); }
+.row2 { display: flex; align-items: center; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 11px; font-weight: 700; color: var(--blueText); background: #fff; border: 1px solid #cfdcf5; white-space: nowrap; }
+.btn img { width: 16px; height: 16px; } .btn.p { color: #fff; border: 0; background: linear-gradient(var(--sky), var(--blue)); } .btn.p img { filter: brightness(0) invert(1); }
+.btn.d { color: #b91c1c; border-color: #fbc4c4; }
+.dev { display: flex; align-items: center; gap: 16px; padding: 16px; }
+.dev.selc { border: 2px solid var(--sky); }
+.dicon { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; } .dicon img { width: 26px; height: 26px; }
+.dev b { font-size: 16px; color: var(--strong); } .dev .m { color: var(--muted); margin-top: 3px; } .dev .c { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.dev .e { color: #b91c1c; font-size: 12px; margin-top: 3px; } .dev .btn { margin-left: auto; }
+.pill { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 99px; padding: 3px 10px; margin-left: 8px; }
+.good { background: var(--goodSoft); color: #15803d; } .warn { background: var(--warnSoft); color: #b45309; } .bad { background: var(--badSoft); color: #b91c1c; } .blue { background: var(--soft); color: var(--blueText); } .grey { background: #eef2f7; color: #475569; }
+.head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; } .head .ic { width: 32px; height: 32px; border-radius: 10px; } .head .ic img { width: 17px; height: 17px; }
+.head b { font-size: 15px; color: var(--strong); display: block; } .head small { color: var(--muted); font-size: 12px; }
+.ring { width: 120px; height: 120px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.ring div { width: 98px; height: 98px; border-radius: 50%; background: #fff; display: grid; place-items: center; text-align: center; }
+.ring b { font-size: 24px; color: var(--strong); display: block; } .ring small { color: var(--muted); font-size: 11px; }
+.hyp { margin-bottom: 14px; } .hyp .t { display: flex; font-weight: 700; color: var(--strong); } .hyp .t span { margin-left: auto; color: var(--blue2); }
+.hyp li { color: var(--muted); font-size: 12px; margin: 4px 0 0 16px; }
+.fact { font-size: 13px; margin-bottom: 7px; }
+.plan { display: flex; align-items: center; gap: 14px; background: var(--softer); border: 1px solid var(--line); border-radius: 14px; padding: 11px; margin-bottom: 8px; }
+.plan .no { width: 30px; height: 30px; border-radius: 15px; background: var(--soft); color: var(--blue); font-weight: 700; display: grid; place-items: center; flex: none; }
+.plan b { color: var(--strong); } .plan .w { color: var(--muted); font-size: 12px; margin-top: 3px; } .plan .btn { margin-left: auto; }
+.assist { width: 350px; background: #fff; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+.ahead { height: 76px; padding: 18px; display: flex; align-items: center; gap: 12px; background: linear-gradient(90deg, #eaf1ff, #fff); border-bottom: 1px solid var(--line); }
+.ahead .ic { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(var(--sky), var(--blue)); } .ahead .ic img { width: 20px; height: 20px; filter: brightness(0) invert(1); }
+.ahead b { font-size: 16px; color: var(--strong); display: block; } .ahead small { color: var(--muted); font-size: 12px; }
+.chat { flex: 1; padding: 16px 20px 16px 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.bub { border-radius: 14px; padding: 10px 13px; max-width: 290px; line-height: 1.4; white-space: pre-line; }
+.bub.me { align-self: flex-end; background: var(--blue2); color: #fff; } .bub.ki { background: var(--softer); border: 1px solid #d6e3fb; }
+.sug { border-radius: 12px; background: var(--softer); border: 1px solid #d6e3fb; color: var(--blueText); padding: 10px 12px; }
+.input { margin: 0 16px 16px; border-radius: 14px; background: var(--softer); border: 1px solid #cfdcf5; height: 50px; display: flex; align-items: center; padding: 5px 5px 5px 14px; color: #94a3b8; }
+.input .btn { margin-left: auto; height: 38px; }
+.mon { display: flex; gap: 10px; margin-bottom: 7px; align-items: flex-start; font-size: 13px; }
+.mon .tm { font-family: Consolas, "DejaVu Sans Mono", monospace; color: var(--muted); font-size: 12px; padding-top: 3px; }
+.mon .pill { margin: 0; width: 100px; text-align: center; flex: none; }
+.chips { display: flex; gap: 8px; } .chip { border-radius: 99px; border: 1px solid #cfdcf5; color: var(--blueText); font-weight: 700; font-size: 12px; padding: 6px 12px; background: #fff; }
+.chip.on { background: var(--blue2); color: #fff; border-color: var(--blue2); }
+.overlay { position: fixed; inset: 0; background: #0b1b3f80; display: grid; place-items: center; }
+.dlg { width: 580px; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 30px 80px rgba(11,27,63,.35); }
+.dlg .dh { height: 74px; background: linear-gradient(90deg, var(--blue), var(--sky)); color: #fff; display: flex; align-items: center; gap: 12px; padding: 0 20px; font-size: 20px; font-weight: 700; }
+.dlg .dh img { width: 26px; filter: brightness(0) invert(1); } .dlg .db { padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.splash { position: fixed; inset: 0; background: linear-gradient(#1e3a8a, #2563eb); display: grid; place-items: center; color: #fff; text-align: center; }
+.splash img { width: 150px; } .splash h1 { font-size: 34px; margin-top: 18px; } .splash h1 span { color: #93c5fd; } .splash p { color: #dbeafe; font-size: 15px; margin-top: 10px; }
+.splash .lb { width: 240px; height: 4px; border-radius: 2px; background: #ffffff33; margin: 20px auto 0; } .splash .lb div { width: 65%; height: 100%; background: #fff; border-radius: 2px; }
+.page { display: none; } .page.on { display: flex; }
+</style>
+</head>
+<body>
+<aside class="side">
+  <div class="brand"><img src="../native/icons/logo.svg"><div><b>USB Recovery</b><span>Studio AI · Butchies</span></div></div>
+  <div class="nav" data-p="0"><img src="../native/icons/home-white.svg">Übersicht<span class="badge">3</span></div>
+  <div class="nav" data-p="1"><img src="../native/icons/spark-white.svg">Diagnose</div>
+  <div class="nav" data-p="2"><img src="../native/icons/save-white.svg">Datenrettung</div>
+  <div class="nav" data-p="3"><img src="../native/icons/tool-white.svg">Reparatur<span class="badge">4</span></div>
+  <div class="nav" data-p="4"><img src="../native/icons/chip-white.svg">KI-Live-Monitor</div>
+  <div class="nav" data-p="5"><img src="../native/icons/folder-white.svg">Protokolle<span class="badge">6</span></div>
+  <div class="nav" data-p="6"><img src="../native/icons/box-white.svg">Wissensbasis</div>
+  <div class="nav" data-p="7"><img src="../native/icons/refresh-white.svg">Einstellungen</div>
+  <div class="sel"><small>AUSGEWÄHLT</small><b>Intenso Speed Line</b><div class="s">090C:1000 · 64.0 GB</div>
+    <div class="s" style="margin-top:6px;color:#fff"><span class="dot" style="background:#d97706"></span>Dateisystem beschädigt (RAW)</div></div>
+</aside>
+
+<div class="main">
+  <div class="top"><div><h1 id="pt">Übersicht</h1><p id="ps">Alle USB-Sticks auf einen Blick</p></div>
+    <div class="ai" id="aiPill"><span class="dot" style="background:#16a34a"></span>KI-Agent aktiv</div>
+    <div class="prog" id="prog" style="display:none"><div class="row">Automatische Reparatur<span>62 %</span></div><div class="bar"><div style="width:62%"></div></div><small>Bootsektor aus Sicherung wiederherstellen</small></div>
+  </div>
+
+  <!-- 0 Übersicht -->
+  <div class="content page" id="p0">
+    <div class="hero"><img class="logo" src="../native/icons/logo.svg">
+      <h2>Dateisystem beschädigt (RAW / „muss formatiert werden“)</h2>
+      <p>Sicherheit 91 % · Datenrettung 90 % · reparierbar</p>
+      <div class="steps"><div class="step done"><i>✓</i>Erkennen</div><div class="ln"></div><div class="step done"><i>✓</i>Diagnose</div><div class="ln"></div>
+        <div class="step cur"><i>3</i>Retten</div><div class="ln"></div><div class="step cur" style="opacity:.95"><i>4</i>Reparieren</div></div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="h"><div class="ic"><img src="../native/icons/usb-blue.svg"></div>USB-Geräte</div><div class="v">3</div><div class="n">Interne Laufwerke werden nie angezeigt</div></div>
+      <div class="tile"><div class="h"><div class="ic" style="background:var(--goodSoft)"><img src="../native/icons/chip-green.svg"></div>KI-Modell</div><div class="v">83 % Treffer</div><div class="n">819 Trainingsbeispiele</div></div>
+      <div class="tile"><div class="h"><div class="ic"><img src="../native/icons/box-blue.svg"></div>Gelernte Fälle</div><div class="v">12</div><div class="n">9 Reparaturen erfolgreich</div></div>
+    </div>
+    <div class="row2"><b style="font-size:17px;color:var(--strong)">USB-Geräte</b><span style="flex:1"></span>
+      <span class="btn"><img src="../native/icons/folder-blue.svg">Abbild öffnen</span><span class="btn p"><img src="../native/icons/refresh-blue.svg">Neu erkennen</span></div>
+    <div class="card dev selc"><div class="dicon warn"><img src="../native/icons/usb-amber.svg"></div>
+      <div><b>Intenso Speed Line</b><span class="pill warn">Bereit</span><div class="m">090C:1000 · 64.0 GB · Laufwerk E:</div><div class="c">Controller: Silicon Motion · SMI SM32xx/SM3257</div></div>
+      <span class="btn p"><img src="../native/icons/spark-blue.svg">Untersuchen</span></div>
+    <div class="card dev"><div class="dicon bad"><img src="../native/icons/usb-red.svg"></div>
+      <div><b>USB DISK 2.0</b><span class="pill bad">Kein Medium</span><div class="m">346D:5678 · –</div><div class="c">Controller: No-Name · unbekannt (oft Fake 'Disk 2.0')</div></div>
+      <span class="btn p"><img src="../native/icons/spark-blue.svg">Untersuchen</span></div>
+    <div class="card dev"><div class="dicon bad"><img src="../native/icons/usb-red.svg"></div>
+      <div><b>Unbekanntes USB-Gerät (Gerätebeschreibung fehlgeschlagen)</b><span class="pill bad">Nicht erkannt</span><div class="m">0000:0002 · –</div>
+      <div class="e">Code 43: Gerät hat Fehler gemeldet (USB-Beschreibung fehlgeschlagen)</div></div>
+      <span class="btn p"><img src="../native/icons/spark-blue.svg">Untersuchen</span></div>
+  </div>
+
+  <!-- 1 Diagnose -->
+  <div class="content page" id="p1">
+    <div class="card">
+      <div class="row2" style="gap:22px;align-items:center">
+        <div class="ring" style="background:conic-gradient(#d97706 0 91%, #e8eef9 91% 100%)"><div><span><b>91 %</b><small>sicher</small></span></div></div>
+        <div style="flex:1"><span class="pill warn" style="margin:0">Befund</span> <span style="color:var(--muted);font-size:12px;margin-left:6px">Intenso Speed Line · 090C:1000</span>
+          <div style="font-size:21px;font-weight:700;color:var(--strong);margin:8px 0 6px">Dateisystem beschädigt (RAW / „muss formatiert werden“)</div>
+          <div>Bootsektor oder Verwaltungsdaten des Dateisystems sind zerstört – meist nach Abziehen ohne Auswerfen oder Stromausfall.</div></div>
+      </div>
+      <div style="height:1px;background:var(--line);margin:16px 0"></div>
+      <div class="row2" style="gap:8px"><span style="color:var(--muted)">Stimmt der Befund? Deine Antwort trainiert die KI.</span>
+        <span class="btn"><img src="../native/icons/check-blue.svg">Ja, stimmt</span><span class="btn"><img src="../native/icons/x-blue.svg">Nein</span><span style="flex:1"></span>
+        <span class="btn"><img src="../native/icons/refresh-blue.svg">Neu untersuchen</span><span class="btn p"><img src="../native/icons/tool-blue.svg">Zur Reparatur</span></div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="h"><div class="ic" style="background:var(--goodSoft)"><img src="../native/icons/save-green.svg"></div>Datenrettung</div><div class="v">90 %</div><div class="n">Sehr gut – Sicherungskopie des Bootsektors ist intakt</div><div class="bar"><div style="width:90%;background:var(--good)"></div></div></div>
+      <div class="tile"><div class="h"><div class="ic" style="background:var(--goodSoft)"><img src="../native/icons/tool-green.svg"></div>Reparierbar</div><div class="v">Ja</div><div class="n">Bootsektor aus der Sicherung wiederherstellen (rückgängig machbar).</div></div>
+      <div class="tile"><div class="h"><div class="ic" style="background:var(--warnSoft)"><img src="../native/icons/box-amber.svg"></div>Rettungsabbild</div><div class="v">Noch keins</div><div class="n">Vor Schreibzugriffen empfohlen</div></div>
+    </div>
+    <div class="row2" style="align-items:flex-start;gap:16px">
+      <div class="card" style="flex:3">
+        <div class="head"><div class="ic"><img src="../native/icons/spark-blue.svg"></div><div><b>Hypothesen der KI</b><small>Jede Annahme mit ihren Belegen</small></div></div>
+        <div class="hyp"><div class="t">Dateisystem beschädigt (RAW / „muss formatiert werden“)<span>91 %</span></div><div class="bar"><div style="width:91%"></div></div>
+          <ul><li>Partition ohne gültiges Dateisystem (RAW) (+60 %)</li><li>Bootsektor zerstört, Sicherungskopie intakt (+60 %)</li><li>Trainiertes Modell erkennt das Fehlerbild (99 %) (+45 %)</li><li>Protokolle melden Dateisystemfehler (+30 %)</li></ul></div>
+        <div class="hyp"><div class="t">Defekte Speicherbereiche<span>18 %</span></div><div class="bar"><div style="width:18%;background:#93c5fd"></div></div>
+          <ul><li>Ereignisanzeige: fehlerhafte Blöcke gemeldet (+23 %)</li></ul></div>
+      </div>
+      <div style="flex:2;display:flex;flex-direction:column;gap:16px">
+        <div class="card"><div class="head"><div class="ic"><img src="../native/icons/chip-blue.svg"></div><div><b>Trainiertes Modell</b><small>Erkennt bekannte Fehlerbilder am Gesamtmuster</small></div></div>
+          <div class="hyp" style="margin-bottom:8px"><div class="t" style="font-weight:400;color:var(--text)">Dateisystem defekt<span style="font-weight:700">99 %</span></div><div class="bar"><div style="width:99%"></div></div></div>
+          <div class="hyp" style="margin-bottom:0"><div class="t" style="font-weight:400;color:var(--text)">Partitionstabelle defekt<span style="font-weight:700">1 %</span></div><div class="bar"><div style="width:1%;background:#bfdbfe"></div></div></div></div>
+        <div class="card"><div class="head"><div class="ic"><img src="../native/icons/usb-blue.svg"></div><div><b>Messwerte</b></div></div>
+          <div class="fact">Controller: Silicon Motion · SMI SM32xx/SM3257</div><div class="fact">Gemeldete Größe: 64.0 GB</div><div class="fact">Schreibschutzbit des Controllers: nicht gesetzt</div>
+          <div class="fact">Lese-Probe: 26/26 lesbar, Ø 3 ms, max. 11 ms, 38.2 MB/s</div><div class="fact">Gefunden: FAT32 bei 1.0 MB (64.0 GB) – nur Sicherung intakt</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 Reparatur -->
+  <div class="content page" id="p3">
+    <div class="hero" style="height:auto;min-height:104px;border-radius:20px;padding:22px 22px 22px 26px;flex-direction:row;align-items:center;gap:16px;flex:none">
+      <div style="flex:1"><div style="font-size:19px;font-weight:700">Automatisch reparieren</div><p style="margin-top:4px">Die KI arbeitet den Plan ab, fragt vor jedem Schreibzugriff und prüft nach jedem Schritt selbst, ob es besser geworden ist.</p></div>
+      <span class="btn" style="width:120px;height:44px;justify-content:center;color:var(--blue);border:0;position:relative">Start</span></div>
+    <div class="card"><div class="head"><div class="ic"><img src="../native/icons/spark-blue.svg"></div><div><b>Plan der KI</b><small>Erst sichern, dann von harmlos nach riskant. Was bei ähnlichen Sticks geholfen hat, kommt zuerst.</small></div></div>
+      <div class="plan"><div class="no">1</div><div><b>Rettungsabbild erstellen</b><span class="pill good">nur lesend</span><div class="w">Sichert alles Lesbare, bevor irgendetwas verändert wird</div></div><span class="btn">Ausführen</span></div>
+      <div class="plan"><div class="no">2</div><div><b>Dateien retten (Dateiliste, auch gelöschte)</b><span class="pill good">nur lesend</span><span class="pill good">Erfahrung: 2 von 2 erfolgreich</span><div class="w">Kopiert Dateien mit Namen und Ordnern</div></div><span class="btn">Ausführen</span></div>
+      <div class="plan"><div class="no">3</div><div><b>Signatursuche (Fotos, Videos, Dokumente)</b><span class="pill good">nur lesend</span><div class="w">Findet Dateien auch ohne Dateisystem</div></div><span class="btn">Ausführen</span></div>
+      <div class="plan"><div class="no">4</div><div><b>Bootsektor aus Sicherung wiederherstellen</b><span class="pill warn">schreibt Verwaltungsdaten (rückgängig machbar)</span><span class="pill good">Erfahrung: 1 von 1 erfolgreich</span><div class="w">Schreibt 1–12 Sektoren, Original wird gesichert</div></div><span class="btn">Ausführen</span></div>
+    </div>
+    <div class="row2" style="align-items:flex-start;gap:16px">
+      <div class="card" style="flex:1"><div class="head"><div class="ic"><img src="../native/icons/refresh-blue.svg"></div><div><b>Optionen</b></div></div>
+        <div>☐ Stick enthält keine wichtigen Daten</div><div style="margin-top:10px">Dateisystem: <span class="btn" style="height:32px">exfat ▾</span></div></div>
+      <div class="card" style="flex:2"><div class="head"><div class="ic"><img src="../native/icons/tool-blue.svg"></div><div><b>Einzelne Werkzeuge</b></div></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px"><span class="btn">Oberflächentest</span><span class="btn">Kapazitätstest</span><span class="btn">Schreibtest</span><span class="btn">USB-Gerät neu starten</span><span class="btn">Schreibschutz entfernen</span><span class="btn">Bootsektor wiederherstellen</span><span class="btn">Partitionstabelle neu</span><span class="btn">Neuflash-Anleitung</span><span class="btn d">Auf echte Größe einrichten</span><span class="btn d">Formatieren FAT32</span><span class="btn d">Formatieren exFAT</span></div></div>
+    </div>
+  </div>
+
+  <!-- 4 Monitor -->
+  <div class="content page" id="p4">
+    <div class="row2"><div class="chips"><span class="chip on">Alle</span><span class="chip">Messung</span><span class="chip">Hypothese</span><span class="chip">Entscheidung</span><span class="chip">Aktion</span><span class="chip">Prüfung</span><span class="chip">Lernen</span><span class="chip">Warnung</span></div><span style="flex:1"></span><span class="btn"><img src="../native/icons/x-blue.svg">Leeren</span></div>
+    <div class="card" style="flex:1;padding:16px" id="monitor"></div>
+  </div>
+</div>
+
+<aside class="assist">
+  <div class="ahead"><div class="ic"><img src="../native/icons/spark-white.svg"></div><div><b>KI-Assistent</b><small>eingebaut · offline</small></div></div>
+  <div class="chat">
+    <div class="bub me">Kann ich meine Fotos retten?</div>
+    <div class="bub ki">Datenrettung: Sehr gut – Sicherungskopie des Bootsektors ist intakt (Chance etwa 90 %).
+Mein Vorschlag: zuerst „Rettungsabbild“, danach „Dateien retten“ in einen Ordner auf deinem PC. Reicht das nicht, findet die „Signatursuche“ Fotos, Videos und Dokumente auch ohne Dateisystem.</div>
+    <div class="bub me">Warum glaubst du das?</div>
+    <div class="bub ki">Darauf stütze ich mich:
+• Partition ohne gültiges Dateisystem (RAW)
+• Bootsektor zerstört, Sicherungskopie intakt
+• Trainiertes Modell erkennt das Fehlerbild (99 %)
+• Protokolle melden Dateisystemfehler</div>
+  </div>
+  <div class="input">Frage stellen …<span class="btn p">Senden</span></div>
+</aside>
+
+<div class="overlay" id="dlg" style="display:none"><div class="dlg"><div class="dh"><img src="../native/icons/warn-white.svg">Freigabe nötig</div>
+  <div class="db"><b style="font-size:17px;color:var(--strong)">Bootsektor aus Sicherung wiederherstellen</b><div><span class="pill warn" style="margin:0">schreibt Verwaltungsdaten (rückgängig machbar)</span></div>
+  <div>Schreibt 1–12 Sektoren, Original wird gesichert<br>Risiko: schreibt Verwaltungsdaten (rückgängig machbar)<br>Erfahrung bei ähnlichen Sticks: 1 von 1 erfolgreich</div>
+  <div class="row2" style="justify-content:flex-end;margin-top:6px"><span class="btn">Ablehnen</span><span class="btn p">Freigeben</span></div></div></div></div>
+
+<div class="splash" id="splash" style="display:none"><div><img src="../native/icons/logo.svg"><h1>Butchies USB Recovery Studio <span>AI</span></h1><p>Erkennen · Retten · Reparieren</p><div class="lb"><div></div></div></div></div>
+
+<script>
+const titles = [["Übersicht","Alle USB-Sticks auf einen Blick"],["Diagnose","Was mit dem Stick los ist – mit Belegen"],["Datenrettung","Erst sichern, dann reparieren"],
+  ["Reparatur","Von harmlos nach riskant – du gibst jeden Schreibschritt frei"],["KI-Live-Monitor","Was die KI misst, denkt, entscheidet und lernt"],["Protokolle",""],["Wissensbasis",""],["Einstellungen",""]];
+const mon = [["21:41:02","Info","grey","KI-Agent aktiv. Wissensbasis: 12 Reparaturversuche (9 erfolgreich), 4 bestätigte/verworfene Diagnosen, 7 Geräte."],
+ ["21:41:02","Lernen","good","Trainiertes Symptom-Modell: 11 Fehlerbilder, 819 Trainingsbeispiele (63 Grundfälle mit Variationen, 0 von dir bestätigte Fälle), Treffergenauigkeit 83 % (Kreuzvalidierung)"],
+ ["21:41:09","Messung","grey","Gerät: Intenso Speed Line · 090C:1000 · 64.0 GB"],["21:41:09","Messung","grey","Controller laut Kennung: Silicon Motion · SMI SM32xx/SM3257"],
+ ["21:41:09","Messung","grey","INQUIRY: „Intenso Speed Line“ Rev. 1100 · READ CAPACITY: 64.0 GB (Blockgröße 512) · MODE SENSE: Schreibschutzbit nicht gesetzt"],
+ ["21:41:09","Hypothese","blue","Sofort-Einschätzung: Kennung und Controller-Antworten unauffällig – Messungen entscheiden"],
+ ["21:41:10","Messung","grey","Lese-Probe: 26/26 lesbar, 0 Fehler, 0 Zeitüberschreitungen, Ø 3 ms"],["21:41:10","Messung","grey","Gefunden: FAT32 bei 1.0 MB (64.0 GB) – nur Sicherung intakt"],
+ ["21:41:10","Messung","grey","Protokolle: 6 relevante Einträge (4 eindeutig diesem Stick zugeordnet)  ·  2026-11-21T18:02:11 Ntfs 55: NTFS-Dateisystemstruktur beschädigt"],
+ ["21:41:10","Info","grey","Messungen abgeschlossen in 1.4 s"],["21:41:10","Hypothese","blue","Trainiertes Modell: Dateisystem defekt 99 %"],
+ ["21:41:10","Hypothese","blue","Dateisystem beschädigt (RAW / „muss formatiert werden“) – 91 %"],["21:41:10","Entscheidung","blue","Plan: Rettungsabbild erstellen (nur lesend)"],
+ ["21:41:10","Entscheidung","blue","Plan: Bootsektor aus Sicherung wiederherstellen (schreibt Verwaltungsdaten (rückgängig machbar)) – Erfahrung: 1/1 erfolgreich"],
+ ["21:43:55","Aktion","grey","FAT32-Bootsektor aus Sicherung wiederhergestellt (3 Sektoren)"],["21:43:55","Prüfung","good","Prüfe Ergebnis: Gerät neu erkennen und neu bewerten"],
+ ["21:43:56","Prüfung","good","Ergebnis: Zustand hat sich verbessert – neuer Befund: Kein Fehler gefunden"],
+ ["21:43:56","Lernen","good","Gespeichert: „Bootsektor aus Sicherung wiederherstellen“ bei Symptomen [fs,backup,readok] → erfolgreich"]];
+document.getElementById("monitor").innerHTML = mon.map(m => `<div class="mon"><span class="tm">${m[0]}</span><span class="pill ${m[2]}">${m[1]}</span><span>${m[3]}</span></div>`).join("");
+const q = new URLSearchParams(location.search); const p = +(q.get("p") || 0);
+document.getElementById("p" + p).classList.add("on");
+document.querySelectorAll(".nav").forEach(n => { if (+n.dataset.p === p) { n.classList.add("active"); const i = n.querySelector("img"); i.src = i.src.replace("-white", "-blue"); } });
+document.getElementById("pt").textContent = titles[p][0]; document.getElementById("ps").textContent = titles[p][1];
+if (q.get("dlg")) document.getElementById("dlg").style.display = "grid";
+if (q.get("busy")) { document.getElementById("prog").style.display = "block"; document.getElementById("aiPill").style.display = "none"; }
+if (q.get("splash")) document.getElementById("splash").style.display = "grid";
+</script>
+</body>
+</html>

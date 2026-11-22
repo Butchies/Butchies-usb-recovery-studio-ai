@@ -9,6 +9,7 @@
 #include "event_logs.h"
 #include "capacity_test.h"
 #include "knowledge_store.h"
+#include "symptom_model.h"
 #include <map>
 #include <optional>
 
@@ -63,35 +64,61 @@ struct Diagnosis {
     int dataPercent = 0;
     bool repairable = false;
     std::vector<std::string> facts;       // wichtigste Messwerte im Klartext
+    std::vector<SymptomModel::Prediction> model;   // Einschätzung des trainierten Modells
     const Hypothesis *top() const { return hypotheses.empty() ? nullptr : &hypotheses.front(); }
 };
 
+// Symptommerkmale – gemeinsame Sprache von Regeln, trainiertem Modell und Wissensbasis
 inline std::string symptomKey(const DeviceFacts &f) {
     std::vector<std::string> s;
-    if (!f.dev.isDisk) s.push_back("nodisk");
-    if (f.dev.problemCode) s.push_back("code" + std::to_string(f.dev.problemCode));
-    if (f.dev.isDisk && !f.dev.mediaPresent) s.push_back("nomedia");
-    if (f.dev.isDisk && f.dev.mediaPresent && f.dev.size < (64ull << 20)) s.push_back("tiny");
+    const auto &dv = f.dev;
+    const auto *ct = f.controller;
+    if (!dv.isDisk) s.push_back("nodisk");
+    if (dv.problemCode == 43) s.push_back("code43");
+    else if (dv.problemCode == 10) s.push_back("code10");
+    else if (dv.problemCode) s.push_back("codeX");
+    if (dv.hasVidPid && dv.vid == 0) s.push_back("vid0000");
+    if (dv.isDisk && !dv.mediaPresent) s.push_back("nomedia");
+    if (dv.isDisk && dv.size == 0) s.push_back("zerosize");
+    if (dv.isDisk && dv.size > 0 && dv.size <= (64ull << 20) && !dv.imageFile) s.push_back("tiny");
+    if (f.scsi.hasSenseFor(0x3A)) s.push_back("sense3a");
+    if (f.scsi.hasSenseFor(0x04)) s.push_back("sense04");
+    if (f.scsi.hasSenseFor(0x11)) s.push_back("sense11");
+    if (f.scsi.hasSenseFor(0x27)) s.push_back("sense27");
     if (f.scsi.writeProtectBit == 1) s.push_back("wpbit");
-    if (f.dev.readOnlyAttr) s.push_back("roattr");
+    if (dv.readOnlyAttr) s.push_back("roattr");
     if (f.host.registryWriteProtect || f.host.policyDenyWrite) s.push_back("hostpolicy");
     if (f.layout.tableDamaged) s.push_back("table");
     if (f.layout.fsDamaged) s.push_back("fs");
     if (f.layout.fsRepairableFromBackup) s.push_back("backup");
-    if (f.layout.sector0Pattern == Pattern::Zeros) s.push_back("zero0");
-    if (f.layout.sector0Pattern == Pattern::Ones) s.push_back("ff0");
-    if (f.probe.errors || f.probe.timeouts) s.push_back("readerr");
+    if (f.layout.sector0Readable && f.layout.sector0Pattern == Pattern::Zeros) s.push_back("zero0");
+    if (f.layout.sector0Readable && f.layout.sector0Pattern == Pattern::Ones) s.push_back("ff0");
+    // "leer" zählt nur, wenn auch kein Dateisystem zu finden ist (ein fast leerer, gesunder Stick ist sonst auch "leer")
+    if (f.probe.ok && double(f.probe.zeros + f.probe.ones + f.probe.repeating) / f.probe.ok >= 0.95 && f.layout.volumes.empty() && f.layout.found.empty()) s.push_back("blank");
+    if (f.probe.errors) s.push_back("readerr");
+    if (f.probe.timeouts) s.push_back("timeout");
     if (f.scan && f.scan->badBlocks) s.push_back("bad");
+    if ((f.scan && f.scan->slowBlocks > 20) || f.probe.maxMs > 1500) s.push_back("slow");
     if (f.capacity && f.capacity->fake) s.push_back("fake");
     if (f.layout.beyondEnd) s.push_back("beyond");
+    if (ct && ct->fakeRisk >= 2) s.push_back("fakevid");
+    if (dv.size >= (256ull << 30)) s.push_back("bigcap");
     if (f.logs.count("connection") >= 3) s.push_back("conn");
+    if (ct && std::string(ct->family).find("Kartenleser") != std::string::npos) s.push_back("cardreader");
+    if (f.logs.count("bad") >= 3) s.push_back("logbad");
+    if (f.logs.count("fs") >= 2) s.push_back("logfs");
+    if (f.logs.count("partition") >= 2) s.push_back("logpart");
+    bool fsok = !f.layout.volumes.empty() && !f.layout.tableDamaged && !f.layout.fsDamaged;
+    for (auto &v : f.layout.volumes) if (!v.primaryValid) fsok = false;
+    if (fsok) s.push_back("fsok");
+    if (f.probe.ok > 0) s.push_back("readok");
     std::string k; for (auto &x : s) { if (!k.empty()) k += ','; k += x; }
     return k;
 }
 
 class DiagnosisEngine {
 public:
-    explicit DiagnosisEngine(const KnowledgeStore *kb = nullptr) : kb_(kb) {}
+    explicit DiagnosisEngine(const KnowledgeStore *kb = nullptr, const SymptomModel *model = nullptr) : kb_(kb), model_(model) {}
 
     Diagnosis evaluate(const DeviceFacts &f, LogFn log = {}) {
         Diagnosis d;
@@ -175,6 +202,18 @@ public:
         // --- Alles in Ordnung
         if (dv.isDisk && dv.mediaPresent && readOk && f.probe.errors == 0 && f.layout.healthy() && sc.writeProtectBit != 1 && !dv.readOnlyAttr && !hostRo)
             add("healthy", 0.8, "Lesen fehlerfrei, Partition und Dateisystem gültig, kein Schreibschutz");
+
+        // --- Trainiertes Modell: erkennt bekannte Fehlerbilder am Gesamtmuster
+        if (model_) {
+            d.model = model_->predict(d.symptoms);
+            for (size_t i = 0; i < d.model.size() && i < 3; ++i) {
+                const auto &p = d.model[i];
+                if (p.p < 0.2 || (p.label == "healthy" && !H.count("healthy"))) continue;
+                if (!H.count(p.label) && p.p < 0.5) continue;
+                add(p.label, 0.45 * p.p, fmt("Trainiertes Modell erkennt das Fehlerbild (%d %%)", int(p.p * 100 + 0.5)));
+            }
+            if (log && !d.model.empty()) log(LogKind::Hypothese, fmt("Trainiertes Modell: %s %d %%", hypothesisTitleShort(d.model[0].label), int(d.model[0].p * 100 + 0.5)));
+        }
 
         // --- Erfahrung aus der Wissensbasis
         if (kb_) {
@@ -360,6 +399,7 @@ private:
     }
 
     const KnowledgeStore *kb_;
+    const SymptomModel *model_;
 };
 
 } // namespace usbr
