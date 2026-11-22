@@ -7,8 +7,8 @@ import QtQuick.Dialogs
 // Aufbau: blaue Seitenleiste · weiße Kopfzeile · Arbeitsfläche · KI-Assistent rechts
 ApplicationWindow {
     id: window
-    width: 1480; height: 920
-    minimumWidth: 1180; minimumHeight: 720
+    width: Math.min(1480, Screen.desktopAvailableWidth - 40); height: Math.min(920, Screen.desktopAvailableHeight - 60)
+    minimumWidth: 1100; minimumHeight: 680
     visible: true
     title: "Butchies USB Recovery Studio AI"
     color: theme.bg
@@ -345,6 +345,7 @@ ApplicationWindow {
         ColumnLayout {
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: 0
             Layout.preferredWidth: 0; Layout.minimumWidth: 480
+            clip: true
 
             Rectangle {   // Kopfzeile
                 Layout.fillWidth: true; implicitHeight: 76; color: "#ffffff"
@@ -383,11 +384,13 @@ ApplicationWindow {
 
             StackLayout {
                 Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.minimumWidth: 0; Layout.preferredWidth: 0
                 currentIndex: window.page
 
                 // ============================================ 0 Übersicht
                 ScrollView {
                     contentWidth: availableWidth; clip: true
+                    Layout.minimumWidth: 0; Layout.preferredWidth: 0
                     ColumnLayout {
                         width: parent.width; spacing: 18
                         Item { implicitHeight: 4 }
@@ -465,6 +468,7 @@ ApplicationWindow {
                 // ============================================ 1 Diagnose
                 ScrollView {
                     contentWidth: availableWidth; clip: true
+                    Layout.minimumWidth: 0; Layout.preferredWidth: 0
                     ColumnLayout {
                         width: parent.width; spacing: 16
                         Item { implicitHeight: 4 }
@@ -531,6 +535,7 @@ ApplicationWindow {
                 // ============================================ 2 Datenrettung
                 ScrollView {
                     contentWidth: availableWidth; clip: true
+                    Layout.minimumWidth: 0; Layout.preferredWidth: 0
                     ColumnLayout {
                         width: parent.width; spacing: 16
                         Item { implicitHeight: 4 }
@@ -566,6 +571,7 @@ ApplicationWindow {
                 // ============================================ 3 Reparatur
                 ScrollView {
                     contentWidth: availableWidth; clip: true
+                    Layout.minimumWidth: 0; Layout.preferredWidth: 0
                     ColumnLayout {
                         width: parent.width; spacing: 16
                         Item { implicitHeight: 4 }
@@ -654,6 +660,7 @@ ApplicationWindow {
                 // ============================================ 4 KI-Live-Monitor
                 ColumnLayout {
                     spacing: 12
+                    Layout.minimumWidth: 0; Layout.preferredWidth: 0
                     RowLayout { Layout.leftMargin: 22; Layout.rightMargin: 22; Layout.topMargin: 18; spacing: 8
                         Repeater { model: ["Alle", "Messung", "Hypothese", "Entscheidung", "Aktion", "Prüfung", "Lernen", "Warnung"]
                             delegate: Rectangle { radius: 999; implicitHeight: 30; implicitWidth: fl.implicitWidth + 24
@@ -690,6 +697,7 @@ ApplicationWindow {
                 // ============================================ 5 Protokolle
                 ScrollView {
                     contentWidth: availableWidth; clip: true
+                    Layout.minimumWidth: 0; Layout.preferredWidth: 0
                     ColumnLayout {
                         width: parent.width; spacing: 12
                         Item { implicitHeight: 4 }
@@ -715,6 +723,7 @@ ApplicationWindow {
                 // ============================================ 6 Wissensbasis
                 ScrollView {
                     contentWidth: availableWidth; clip: true
+                    Layout.minimumWidth: 0; Layout.preferredWidth: 0
                     ColumnLayout {
                         width: parent.width; spacing: 16
                         Item { implicitHeight: 4 }
@@ -741,6 +750,7 @@ ApplicationWindow {
                 // ============================================ 7 Einstellungen
                 ScrollView {
                     contentWidth: availableWidth; clip: true
+                    Layout.minimumWidth: 0; Layout.preferredWidth: 0
                     ColumnLayout {
                         width: parent.width; spacing: 16
                         Item { implicitHeight: 4 }
