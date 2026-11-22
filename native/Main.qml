@@ -396,19 +396,20 @@ ApplicationWindow {
                         Item { implicitHeight: 4 }
                         Rectangle {   // Hero
                             Layout.fillWidth: true; Layout.leftMargin: 22; Layout.rightMargin: 22
-                            radius: 22; implicitHeight: 214; clip: true
+                            radius: 22; implicitHeight: Math.max(214, heroCol.implicitHeight + 52); clip: true
                             gradient: Gradient { orientation: Gradient.Horizontal; GradientStop { position: 0; color: "#1d4ed8" } GradientStop { position: 1; color: "#3b82f6" } }
                             Rectangle { width: 280; height: 280; radius: 140; x: parent.width - 200; y: -90; color: "#ffffff"; opacity: 0.08 }
                             Rectangle { width: 160; height: 160; radius: 80; x: parent.width - 330; y: 120; color: "#ffffff"; opacity: 0.06 }
                             Image { source: "icons/logo.svg"; sourceSize: Qt.size(200, 200); width: 92; height: 92; x: parent.width - 122; y: 18 }
                             ColumnLayout {
-                                anchors.fill: parent; anchors.margins: 26; spacing: 10
+                                id: heroCol
+                                anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 26; spacing: 10
                                 Label { text: window.hasDiag ? diag.headline : (window.dev ? "Bereit zur Untersuchung" : "Stick einstecken – die KI übernimmt den Rest")
                                     font.pixelSize: 24; font.bold: true; color: "#ffffff"; wrapMode: Text.WordWrap; Layout.fillWidth: true; Layout.rightMargin: 140 }
                                 Label { text: window.hasDiag ? ("Sicherheit " + diag.confidence + " % · Datenrettung " + diag.dataPercent + " % · " + (diag.repairable ? "reparierbar" : "nicht oder nur eingeschränkt reparierbar"))
                                                              : "Erkennt auch Sticks mit 0 MB, „kein Medium“ oder Code 43. Alles ist zuerst nur lesend."
                                     color: "#dbeafe"; wrapMode: Text.WordWrap; Layout.fillWidth: true; Layout.rightMargin: 140 }
-                                Item { Layout.fillHeight: true }
+                                Item { implicitHeight: 14 }
                                 RowLayout { Layout.fillWidth: true; spacing: 0
                                     Step { stepIndex: 0; label: "Erkennen" }
                                     Rectangle { Layout.fillWidth: true; height: 2; color: "#55ffffff"; Layout.alignment: Qt.AlignTop; Layout.topMargin: 20 }
@@ -782,8 +783,8 @@ ApplicationWindow {
                         Rectangle { width: 40; height: 40; radius: 12; gradient: Gradient { GradientStop { position: 0; color: theme.sky } GradientStop { position: 1; color: theme.blue } }
                             Image { anchors.centerIn: parent; source: window.icon("spark", "white"); sourceSize: Qt.size(20, 20) } }
                         ColumnLayout { spacing: 0; Layout.fillWidth: true
-                            Label { text: "KI-Assistent"; font.pixelSize: 16; font.bold: true; color: theme.strong }
-                            Label { text: controller.llmUrl !== "" ? "lokale KI verbunden" : "eingebaut · offline"; color: theme.muted; font.pixelSize: 12 } } }
+                            Label { text: "KI-Assistent"; font.pixelSize: 16; font.bold: true; color: theme.strong; Layout.fillWidth: true }
+                            Label { text: controller.llmUrl !== "" ? "lokale KI verbunden" : "eingebaut · offline"; color: theme.muted; font.pixelSize: 12; Layout.fillWidth: true } } }
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: theme.line } }
                 ColumnLayout { Layout.fillWidth: true; Layout.fillHeight: true; Layout.margins: 16; spacing: 10
                     Label { visible: controller.chat.length === 0; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: theme.muted
