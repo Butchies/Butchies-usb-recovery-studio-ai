@@ -1,0 +1,24 @@
+# Build outputs
+build/
+dist/
+out/
+*.iso
+*.img
+*.bin
+*.exe
+*.dll
+*.so
+*.o
+*.obj
+# Local AI models, firmware and sensitive logs
+models/
+firmware/private/
+firmware/downloads/
+logs/
+cases/
+*.gguf
+*.safetensors
+.env
+linux-boot/work/
+linux-boot/out/
+build/
