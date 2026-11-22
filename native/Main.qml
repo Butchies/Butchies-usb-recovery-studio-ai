@@ -486,13 +486,22 @@ ApplicationWindow {
                                     Label { text: diag.explanation || ""; wrapMode: Text.WordWrap; Layout.fillWidth: true; color: theme.text } }
                             }
                             Rectangle { Layout.fillWidth: true; height: 1; color: theme.line }
-                            RowLayout { spacing: 8
-                                Label { text: "Stimmt der Befund? Deine Antwort trainiert die KI."; color: theme.muted }
-                                ActionButton { text: "Ja, stimmt"; iconName: "check"; onClicked: controller.confirmDiagnosis(diag.topId, true) }
-                                ActionButton { text: "Nein"; iconName: "x"; onClicked: controller.confirmDiagnosis(diag.topId, false) }
-                                Item { Layout.fillWidth: true }
+                            RowLayout { spacing: 10; Layout.fillWidth: true
+                                Rectangle { width: 36; height: 36; radius: 12; color: theme.soft; Layout.alignment: Qt.AlignTop
+                                    Image { anchors.centerIn: parent; source: window.icon("spark", "blue"); sourceSize: Qt.size(18, 18) } }
+                                ColumnLayout { Layout.fillWidth: true; Layout.preferredWidth: 0; spacing: 2
+                                    Label { text: "Liegt die KI richtig?"; font.bold: true; color: theme.strong }
+                                    Label { text: "Deine Bewertung trainiert das Modell sofort. Liegt sie falsch, wähle unten bei den Hypothesen „Das ist es“ – oder „Keine davon“."; color: theme.muted; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true } }
+                            }
+                            Flow { Layout.fillWidth: true; spacing: 8
+                                ActionButton { text: "Ja, stimmt"; iconName: "check"; primary: controller.rating.state !== "done"; onClicked: controller.confirmDiagnosis(diag.topId, true) }
+                                ActionButton { text: "Nein, falsch"; iconName: "x"; onClicked: controller.confirmDiagnosis(diag.topId, false) }
                                 ActionButton { text: "Neu untersuchen"; iconName: "refresh"; enabled: !controller.busy; onClicked: controller.diagnose() }
-                                ActionButton { text: "Zur Reparatur"; iconName: "tool"; primary: true; onClicked: window.page = 3 } }
+                                ActionButton { text: "Zur Reparatur"; iconName: "tool"; onClicked: window.page = 3 } }
+                            Rectangle { visible: controller.rating.text !== undefined && controller.rating.text !== ""; Layout.fillWidth: true; radius: 12
+                                color: controller.rating.good ? theme.goodSoft : theme.warnSoft; implicitHeight: ratingLabel.implicitHeight + 20
+                                Label { id: ratingLabel; anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; anchors.margins: 12
+                                    text: controller.rating.text || ""; wrapMode: Text.WordWrap; font.bold: true; color: controller.rating.good ? "#15803d" : "#b45309" } }
                         }
                         RowLayout { visible: window.hasDiag; Layout.leftMargin: 22; Layout.rightMargin: 22; spacing: 16
                             Tile { label: "Datenrettung"; iconName: "save"; value: (diag.dataPercent || 0) + " %"; note: diag.dataChance || ""; level: diag.dataPercent >= 70 ? "good" : diag.dataPercent >= 30 ? "warn" : "bad"; fill: diag.dataPercent || 0 }
@@ -505,13 +514,18 @@ ApplicationWindow {
                                 Repeater {
                                     model: diag.hypotheses || []
                                     delegate: ColumnLayout { Layout.fillWidth: true; spacing: 5
-                                        RowLayout { Label { text: modelData.title; font.bold: true; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: theme.strong }
-                                            Label { text: modelData.confidence + " %"; font.bold: true; color: theme.blue2 } }
+                                        RowLayout { Label { text: modelData.title; font.bold: true; Layout.fillWidth: true; Layout.preferredWidth: 0; wrapMode: Text.WordWrap; color: theme.strong }
+                                            Label { text: modelData.confidence + " %"; font.bold: true; color: theme.blue2 }
+                                            Rectangle { radius: 999; implicitHeight: 26; implicitWidth: thisLbl.implicitWidth + 20; color: thisHover.hovered ? theme.soft : "#ffffff"; border.color: "#cfdcf5"
+                                                HoverHandler { id: thisHover; cursorShape: Qt.PointingHandCursor }
+                                                Label { id: thisLbl; anchors.centerIn: parent; text: "Das ist es"; font.pixelSize: 12; font.bold: true; color: theme.blueText }
+                                                TapHandler { onTapped: controller.confirmDiagnosis(modelData.id, true) } } }
                                         Bar { Layout.fillWidth: true; value: modelData.confidence; barColor: index === 0 ? theme.blue2 : "#93c5fd" }
                                         Repeater { model: modelData.evidence
                                             delegate: Label { text: "•  " + modelData; color: theme.muted; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true } }
                                         Item { implicitHeight: 6 } }
                                 }
+                                ActionButton { text: "Keine davon trifft zu"; iconName: "x"; onClicked: controller.rejectAll() }
                             }
                             ColumnLayout { Layout.alignment: Qt.AlignTop; Layout.preferredWidth: 2; Layout.fillWidth: true; spacing: 16
                                 Card {
@@ -598,20 +612,23 @@ ApplicationWindow {
                                     RowLayout { id: planRow; anchors.fill: parent; anchors.margins: 11; spacing: 14
                                         Rectangle { width: 30; height: 30; radius: 15; color: theme.soft
                                             Label { anchors.centerIn: parent; text: String(index + 1); font.bold: true; color: theme.blue } }
-                                        ColumnLayout { Layout.fillWidth: true; spacing: 3
-                                            RowLayout { spacing: 8
-                                                Label { text: modelData.title; font.bold: true; color: theme.strong }
+                                        ColumnLayout { Layout.fillWidth: true; Layout.preferredWidth: 0; spacing: 4
+                                            Label { text: modelData.title; font.bold: true; color: theme.strong; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                                            Flow { Layout.fillWidth: true; spacing: 6
                                                 Pill { text: modelData.riskText; level: modelData.manual ? "blue" : window.riskLevel(modelData.risk) }
                                                 Pill { visible: modelData.learned !== ""; text: "Erfahrung: " + modelData.learned; level: "good" } }
                                             Label { text: modelData.why; color: theme.muted; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true } }
-                                        ActionButton { text: modelData.manual ? "Anleitung" : "Ausführen"; enabled: !controller.busy; danger: modelData.risk === 3 && !modelData.manual; onClicked: controller.runAction(modelData.id) } }
+                                        ActionButton { Layout.alignment: Qt.AlignVCenter; text: modelData.manual ? "Anleitung" : "Ausführen"; enabled: !controller.busy; danger: modelData.risk === 3 && !modelData.manual; onClicked: controller.runAction(modelData.id) } }
                                 }
                             }
                         }
                         RowLayout { Layout.leftMargin: 22; Layout.rightMargin: 22; spacing: 16
                             Card { Layout.alignment: Qt.AlignTop
                                 Heading { text: "Optionen"; iconName: "refresh" }
-                                CheckBox { text: "Stick enthält keine wichtigen Daten\n(schaltet Kapazitätstest und Formatieren ohne Abbild frei)"; checked: controller.stickIsEmpty; onToggled: controller.stickIsEmpty = checked }
+                                RowLayout { Layout.fillWidth: true; spacing: 4
+                                    CheckBox { id: emptyBox; checked: controller.stickIsEmpty; onToggled: controller.stickIsEmpty = checked; Layout.alignment: Qt.AlignTop }
+                                    Label { text: "Stick enthält keine wichtigen Daten (schaltet Kapazitätstest und Formatieren ohne Abbild frei)"; wrapMode: Text.WordWrap; Layout.fillWidth: true; Layout.topMargin: 10
+                                        TapHandler { onTapped: controller.stickIsEmpty = !controller.stickIsEmpty } } }
                                 RowLayout { Label { text: "Dateisystem:" }
                                     ComboBox { model: ["exfat", "fat32", "ntfs"]; currentIndex: Math.max(0, model.indexOf(controller.formatFs)); onActivated: controller.formatFs = currentText } }
                             }
@@ -721,6 +738,15 @@ ApplicationWindow {
                             RowLayout { spacing: 6
                                 Label { text: controller.busy ? "Jetzt:" : "Ergebnis:"; font.bold: true; color: theme.strong }
                                 Label { text: controller.busy ? controller.progressText : controller.lastResult.split("\n")[0]; color: theme.text; elide: Text.ElideRight; Layout.fillWidth: true } }
+                            Rectangle {   // Bewertung nach dem Ablauf
+                                visible: !controller.busy && runCard.total > 0
+                                Layout.fillWidth: true; radius: 12; color: theme.softer; border.color: theme.line; implicitHeight: rateRow.implicitHeight + 20
+                                RowLayout { id: rateRow; anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; anchors.margins: 10; spacing: 8
+                                    Label { text: controller.rating.runText ? controller.rating.runText : "Hat es geholfen? Deine Antwort fließt in die Erfahrung der KI ein."
+                                        wrapMode: Text.WordWrap; Layout.fillWidth: true; Layout.preferredWidth: 0; font.bold: controller.rating.runText !== undefined; color: controller.rating.runText ? "#15803d" : theme.text }
+                                    ActionButton { visible: !controller.rating.runText; text: "Ja, Stick geht wieder"; iconName: "check"; primary: true; onClicked: controller.rateRun(true) }
+                                    ActionButton { visible: !controller.rating.runText; text: "Nein"; iconName: "x"; onClicked: controller.rateRun(false) } }
+                            }
                             RowLayout {   // Zeitleiste der Schritte
                                 visible: runCard.total > 0; Layout.fillWidth: true; Layout.topMargin: 6; spacing: 0
                                 Repeater {
@@ -803,7 +829,7 @@ ApplicationWindow {
                                 RowLayout { spacing: 8
                                     Rectangle { width: 6; height: 30; radius: 3; color: modelData.weight >= 3 ? theme.bad : modelData.weight === 2 ? theme.warn : "#94a3b8" }
                                     Label { text: modelData.time; font.family: theme.mono; color: theme.muted }
-                                    Label { text: modelData.source + (modelData.id ? " · " + modelData.id : ""); font.bold: true; Layout.fillWidth: true; color: theme.strong }
+                                    Label { text: modelData.source + (modelData.id ? " · " + modelData.id : ""); font.bold: true; Layout.fillWidth: true; color: theme.strong; elide: Text.ElideRight }
                                     Pill { text: modelData.matched ? "diesem Stick zugeordnet" : "allgemein"; level: modelData.matched ? "blue" : "grey" }
                                     Pill { text: modelData.weight >= 3 ? "schwer" : modelData.weight === 2 ? "mittel" : "leicht"; level: modelData.weight >= 3 ? "bad" : modelData.weight === 2 ? "warn" : "grey" } }
                                 Label { text: modelData.meaning; wrapMode: Text.WordWrap; Layout.fillWidth: true; color: theme.strong; font.pixelSize: 14 }
@@ -834,7 +860,7 @@ ApplicationWindow {
                                 delegate: RowLayout { Layout.fillWidth: true; spacing: 10
                                     Label { text: modelData.time; font.family: theme.mono; color: theme.muted; font.pixelSize: 12 }
                                     Pill { text: modelData.kind; level: "blue" }
-                                    Label { text: modelData.device + " · " + modelData.what + (modelData.symptoms ? " · [" + modelData.symptoms + "]" : ""); Layout.fillWidth: true; elide: Text.ElideRight }
+                                    Label { text: modelData.device + " · " + modelData.what + (modelData.symptoms ? " · [" + modelData.symptoms + "]" : ""); Layout.fillWidth: true; wrapMode: Text.WrapAnywhere }
                                     Pill { text: modelData.ok ? (modelData.kind === "Versuch" ? "geholfen" : "bestätigt") : (modelData.kind === "Versuch" ? "ohne Erfolg" : "verworfen"); level: modelData.ok ? "good" : "warn" } } }
                         }
                         Item { implicitHeight: 18 }

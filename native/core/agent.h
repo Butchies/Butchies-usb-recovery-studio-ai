@@ -128,6 +128,19 @@ public:
         if (cb.log) cb.log(LogKind::Lernen, std::string("Diagnose „") + hypId + (correct ? "“ bestätigt – wird bei ähnlichen Sticks stärker gewichtet" : "“ verworfen – wird bei ähnlichen Sticks schwächer gewichtet"));
     }
 
+    // Keine der Hypothesen trifft zu: alle verwerfen
+    void rejectAll(const AgentCallbacks &cb) {
+        for (auto &h : diag_.hypotheses) kb_.recordDiagnosis(facts_.dev.idString(), family(), diag_.symptoms, h.id, false);
+        model_.train(&kb_);
+        if (cb.log) cb.log(LogKind::Lernen, "Alle Hypothesen als falsch markiert – werden bei ähnlichen Sticks schwächer gewichtet");
+    }
+    // Bewertung des Benutzers nach einem Ablauf: Hat es geholfen?
+    void rateRun(const std::vector<std::string> &actions, bool helped, const AgentCallbacks &cb) {
+        for (auto &a : actions) kb_.recordAction(facts_.dev.idString(), family(), runSymptoms_.empty() ? diag_.symptoms : runSymptoms_, a, helped);
+        if (cb.log) cb.log(LogKind::Lernen, fmt("Deine Bewertung: Ablauf hat %s – %zu Schritte bei Symptomen [%s] gespeichert",
+                                                helped ? "geholfen" : "nicht geholfen", actions.size(), runSymptoms_.c_str()));
+    }
+
     // --- Einen Schritt ausführen (Freigabe muss vorher eingeholt sein)
     StepOutcome execute(const std::string &id, const RunOptions &opt, const AgentCallbacks &cb, CancelToken *cancel) {
         StepOutcome o; o.action = id;
@@ -135,6 +148,7 @@ public:
         const UsbDevice &dev = facts_.dev;
         ensureCaseDir();
         const std::string symptomsBefore = diag_.symptoms;
+        if (!autoRunning_) runSymptoms_ = symptomsBefore;
         const std::string topBefore = diag_.top() ? diag_.top()->id : "";
         const double confBefore = diag_.top() ? diag_.top()->confidence : 0;
         curTitle_ = titleOf(id);
@@ -280,6 +294,8 @@ public:
         std::vector<std::string> tried;
         auto L = [&](LogKind k, const std::string &s) { if (cb.log) cb.log(k, s); };
         L(LogKind::Entscheidung, "Automatischer Ablauf gestartet: zuerst sichern, dann von harmlos nach riskant");
+        runSymptoms_ = diag_.symptoms; autoRunning_ = true;
+        struct Reset { bool &f; ~Reset() { f = false; } } reset{autoRunning_};
         auto S = [&](const std::string &id, const std::string &title, int st, const std::string &info) { if (cb.step) cb.step(id, title, st, info); };
         for (auto &a : diag_.plan) S(a.id, a.title, 0, a.manual ? "Hinweis" : (a.risk >= Risk::Harmlos ? "fragt vorher nach" : "wartet"));
         for (int round = 0; round < 15; ++round) {
@@ -373,7 +389,8 @@ private:
     }
 
     KnowledgeStore &kb_;
-    std::string work_, caseDir_, curTitle_;
+    std::string work_, caseDir_, curTitle_, runSymptoms_;
+    bool autoRunning_ = false;
     DeviceFacts facts_;
     Diagnosis diag_;
     SymptomModel model_;

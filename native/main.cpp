@@ -58,6 +58,7 @@ class RecoveryController final : public QObject {
     Q_PROPERTY(QString caseDir READ caseDir NOTIFY lastResultChanged)
     Q_PROPERTY(QString hostWarning READ hostWarning NOTIFY devicesChanged)
     Q_PROPERTY(QVariantMap run READ run NOTIFY runChanged)
+    Q_PROPERTY(QVariantMap rating READ rating NOTIFY ratingChanged)
 
 public:
     explicit RecoveryController(QObject *parent = nullptr) : QObject(parent) {
@@ -182,6 +183,7 @@ public:
     Q_INVOKABLE void diagnose() {
         if (!current()) return;
         UsbDevice dev = *current();
+        m_rating.clear(); emit ratingChanged();
         start("Diagnose", [this, dev] {
             m_agent->diagnose(dev, callbacks(), &m_cancel, true);
             if (dev.imageFile) m_agent->setImage(dev.path);
@@ -226,10 +228,44 @@ public:
         std::lock_guard<std::mutex> l(m_amx);
         m_answer = yes ? 1 : 0; m_acv.notify_all();
     }
+    QVariantMap rating() const { return m_rating; }
+
+    // Bewertung durch den Benutzer. Läuft gerade ein Vorgang, wird sie danach gespeichert.
     Q_INVOKABLE void confirmDiagnosis(const QString &hyp, bool correct) {
-        if (m_busy) return;
-        m_agent->confirm(s(hyp), correct, callbacks());
-        updateKnowledge();
+        QString title = hyp;
+        for (auto &h : m_diag["hypotheses"].toList()) if (h.toMap()["id"].toString() == hyp) title = h.toMap()["title"].toString();
+        auto apply = [this, hyp, correct, title] {
+            m_agent->confirm(s(hyp), correct, callbacks());
+            const auto &m = m_agent->model();
+            m_rating["text"] = (correct ? QString("✓ Gespeichert: „%1“ ist richtig.").arg(title) : QString("Gespeichert: „%1“ ist falsch.").arg(title))
+                + QString(" Modell neu trainiert – %1 Beispiele, davon %2 von dir bewertet.").arg(m.trainingSize()).arg(m.confirmedCases());
+            m_rating["good"] = correct; m_rating["state"] = "done";
+            emit ratingChanged(); updateKnowledge();
+        };
+        if (m_busy) { m_pending.push_back(apply); m_rating["text"] = "Bewertung vorgemerkt – wird gespeichert, sobald der laufende Vorgang fertig ist."; m_rating["good"] = true; emit ratingChanged(); return; }
+        apply();
+    }
+    Q_INVOKABLE void rejectAll() {
+        auto apply = [this] {
+            m_agent->rejectAll(callbacks());
+            m_rating["text"] = "Gespeichert: Keine der Hypothesen trifft zu. Die KI gewichtet diese Fehlerbilder bei ähnlichen Sticks schwächer – beschreib mir im Assistenten, was es war.";
+            m_rating["good"] = false; m_rating["state"] = "done";
+            emit ratingChanged(); updateKnowledge();
+        };
+        if (m_busy) { m_pending.push_back(apply); return; }
+        apply();
+    }
+    Q_INVOKABLE void rateRun(bool helped) {
+        std::vector<std::string> ids;
+        for (auto &v : m_runSteps) { auto m = v.toMap(); int st = m["state"].toInt(); if (st == 2 || st == 3) ids.push_back(s(m["id"].toString())); }
+        auto apply = [this, ids, helped] {
+            m_agent->rateRun(ids, helped, callbacks());
+            m_rating["runText"] = helped ? QString("✓ Danke! Gespeichert – diese Schritte bekommen bei ähnlichen Sticks Vorrang.")
+                                         : QString("Gespeichert – diese Schritte werden bei ähnlichen Sticks nach hinten gestellt.");
+            emit ratingChanged(); updateKnowledge();
+        };
+        if (m_busy) { m_pending.push_back(apply); return; }
+        apply();
     }
     Q_INVOKABLE void openFolder(const QString &p) { QDesktopServices::openUrl(QUrl::fromLocalFile(p)); }
     Q_INVOKABLE void clearMonitor() { m_monitor.clear(); emit monitorChanged(); }
@@ -274,6 +310,7 @@ signals:
     void optionsChanged();
     void lastResultChanged();
     void runChanged();
+    void ratingChanged();
 
 private:
     const UsbDevice *current() const { return m_selected >= 0 && size_t(m_selected) < m_devs.size() ? &m_devs[size_t(m_selected)] : nullptr; }
@@ -311,12 +348,15 @@ private:
                     emit runChanged();
                 }
                 emit busyChanged(); emit progressChanged(); emit lastResultChanged();
+                auto pending = std::move(m_pending); m_pending.clear();
+                for (auto &f : pending) f();
                 updateKnowledge();
             }, Qt::QueuedConnection);
         });
     }
 
     void beginRun(const QString &title, const QVariantList &steps) {
+        m_rating.remove("runText"); emit ratingChanged();
         m_runActive = true; m_runTitle = title; m_runSteps = steps;
         m_runStarted = double(QDateTime::currentMSecsSinceEpoch());
         m_runDevice = current() ? q(current()->displayName()) : QString();
@@ -448,7 +488,8 @@ private:
     std::unique_ptr<RecoveryAgent> m_agent;
     std::vector<UsbDevice> m_devs, m_images;
     QVariantList m_devList, m_monitor, m_chat;
-    QVariantMap m_diag, m_approval, m_knowledge;
+    QVariantMap m_diag, m_approval, m_knowledge, m_rating;
+    std::vector<std::function<void()>> m_pending;
     int m_selected = -1;
     bool m_runActive = false;
     QString m_runTitle, m_runDevice;
