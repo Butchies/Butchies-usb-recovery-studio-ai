@@ -1,0 +1,86 @@
+name: Windows-Installer
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "[ 5 %] Qt 6 installieren"
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: "[25 %] Visual Studio vorbereiten"
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: "[35 %] Konfigurieren"
+        run: cmake -S native -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: "[60 %] Kompilieren"
+        run: cmake --build build --config Release
+
+      - name: "[75 %] Qt-Laufzeit einsammeln"
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build\Butchies-USB-Recovery-Studio-AI.exe dist\
+          windeployqt --release --qmldir native --no-translations --compiler-runtime dist\Butchies-USB-Recovery-Studio-AI.exe
+
+      - name: "[80 %] Echte Bildschirmfotos der Oberfläche"
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          New-Item -ItemType Directory -Force shots | Out-Null
+          $env:QT_FORCE_STDERR_LOGGING = "1"
+          foreach ($s in @(@{n="start";d=800},@{n="programm";d=6000})) {
+            $env:USBR_SCREENSHOT = "$PWD\shots\$($s.n).png"; $env:USBR_SCREENSHOT_DELAY = "$($s.d)"
+            $p = Start-Process dist\Butchies-USB-Recovery-Studio-AI.exe -PassThru -RedirectStandardError "shots\$($s.n)-log.txt"
+            if (-not $p.WaitForExit(30000)) { $p.Kill() }
+          }
+          Get-ChildItem shots
+          Get-Content shots\programm-log.txt -ErrorAction SilentlyContinue | Select-Object -First 40
+
+      - name: "[82 %] Bildschirmfotos in Zweig bildschirmfotos ablegen"
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Set-Location shots
+          git init -q; git checkout -q -b bildschirmfotos
+          git config user.name "build"; git config user.email "build@users.noreply.github.com"
+          git add -A; git commit -q -m "Bildschirmfotos $env:GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" bildschirmfotos
+
+      - name: "[85 %] Installer bauen"
+        shell: pwsh
+        run: |
+          $ver = "0.2.$env:GITHUB_RUN_NUMBER"
+          if ($env:GITHUB_REF -like 'refs/tags/v*') { $ver = $env:GITHUB_REF_NAME.TrimStart('v') }
+          "VER=$ver" | Out-File -Append $env:GITHUB_ENV
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$ver" installer\ButchiesUsbRecoveryStudioAI.iss
+
+      - name: "[95 %] Installer hochladen"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ButchiesUsbRecoveryStudioAI_Setup_${{ env.VER }}_x64
+          path: out/*.exe
+
+      - name: "[100 %] Release veröffentlichen"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', env.VER) }}
+          name: Butchies USB Recovery Studio AI ${{ env.VER }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          body_path: installer/RELEASE_NOTES.md
+          files: out/*.exe

@@ -19,6 +19,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QIcon>
+#include <QQuickWindow>
 #include <QTimer>
 #include <QThread>
 #include <QTime>
@@ -432,6 +433,15 @@ int main(int argc, char *argv[]) {
     engine.setInitialProperties({{"controller", QVariant::fromValue(&controller)}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
     engine.loadFromModule("UsbRecovery", "Main");
+    // Für den Build: echtes Bildschirmfoto der Oberfläche speichern und beenden
+    if (qEnvironmentVariableIsSet("USBR_SCREENSHOT")) {
+        const int delay = qEnvironmentVariableIntValue("USBR_SCREENSHOT_DELAY") > 0 ? qEnvironmentVariableIntValue("USBR_SCREENSHOT_DELAY") : 7000;
+        QTimer::singleShot(delay, &app, [&engine, &app] {
+            if (!engine.rootObjects().isEmpty())
+                if (auto *w = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) w->grabWindow().save(qEnvironmentVariable("USBR_SCREENSHOT"));
+            app.quit();
+        });
+    }
     return app.exec();
 }
 
