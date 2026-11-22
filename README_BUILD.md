@@ -1,4 +1,4 @@
-# Butchies USB Recovery Studio AI – Entwicklungsstand 0.1.0
+# Butchies USB Recovery Studio AI – Entwicklungsstand 0.2.0
 
 ## Tatsächlich vorhandene Funktionen (programmiert)
 - **Geräteerkennung** (`core/usb_inventory.h`): nur USB-Datenträger (Systemdatenträger ausgeschlossen), VID/PID, Seriennummer,
@@ -24,10 +24,16 @@
 - **KI-Agent** (`core/diagnosis_engine.h`, `core/agent.h`): Hypothesen mit Belegen (Noisy-OR), Datenrettungs-Chance,
   Reparierbarkeit, Aktionsplan von harmlos nach riskant, Freigabe-Dialog, Selbstprüfung nach jedem Schritt
   (neu erkennen und neu bewerten), automatischer Ablauf, Fallakten.
+- **Trainiertes Symptom-Modell** (`core/symptom_model.h`): Naive Bayes über Symptommerkmale, trainiert aus 63 typischen
+  Fehlerbildern (je 12 Variationen) plus allen vom Benutzer bestätigten Diagnosen; Kreuzvalidierung 83 % Treffer.
+  Sofort-Einschätzung nach Kennung/Controller-Antwort, Protokolle werden parallel gelesen, Tiefensuche nur bei Auffälligkeiten.
 - **Wissensbasis** (`core/knowledge_store.h`): jeder Versuch und jede bestätigte/verworfene Diagnose je Kennung und
   Symptommuster; ähnliche Fälle verändern Gewichtung und Reihenfolge.
 - **Oberfläche** (`main.cpp`, `Main.qml`): Geräte, Diagnose, Datenrettung, Reparatur, KI-Live-Monitor, Protokolle,
   Wissensbasis, Einstellungen, KI-Assistent (eingebaut oder lokale KI über OpenAI-kompatiblen Endpunkt), Fortschritt in Prozent.
+
+## Vorschau
+Die Oberfläche als Bildschirmfotos mit Beispieldaten: `design/vorschau/` (erstellt aus `design/vorschau.html`, einem Nachbau des QML-Designs).
 
 ## Geprüft
 Der plattformunabhängige Kern wurde unter Linux mit Testabbildern durchgespielt: zerstörter FAT32-Bootsektor
