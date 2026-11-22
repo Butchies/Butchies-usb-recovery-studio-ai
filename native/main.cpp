@@ -57,6 +57,7 @@ class RecoveryController final : public QObject {
     Q_PROPERTY(QString lastResult READ lastResult NOTIFY lastResultChanged)
     Q_PROPERTY(QString caseDir READ caseDir NOTIFY lastResultChanged)
     Q_PROPERTY(QString hostWarning READ hostWarning NOTIFY devicesChanged)
+    Q_PROPERTY(QVariantMap run READ run NOTIFY runChanged)
 
 public:
     explicit RecoveryController(QObject *parent = nullptr) : QObject(parent) {
@@ -111,6 +112,10 @@ public:
                 {"controllers", int(controllerHints().size())}, {"recent", recent}, {"path", m_work + "/wissensbasis.txt"}};
     }
     QVariantMap approval() const { return m_approval; }
+    QVariantMap run() const {
+        return {{"active", m_runActive}, {"title", m_runTitle}, {"steps", m_runSteps}, {"started", m_runStarted}, {"device", m_runDevice}};
+    }
+    Q_INVOKABLE void clearRun() { if (m_busy) return; m_runSteps.clear(); m_runTitle.clear(); emit runChanged(); }
     QVariantList chat() const { return m_chat; }
     QString targetDir() const { return m_target; }
     void setTargetDir(const QString &v) { m_target = v; QSettings().setValue("targetDir", v); emit optionsChanged(); }
@@ -184,24 +189,29 @@ public:
     }
 
     Q_INVOKABLE void runAction(const QString &id) {
-        if (!current()) return;
+        if (!current() || m_busy) return;
         RunOptions o = options();
         std::string aid = s(id);
+        beginRun(actionTitle(id), {QVariantMap{{"id", id}, {"title", actionTitle(id)}, {"state", 0}, {"info", "wartet"}}});
         start(actionTitle(id), [this, aid, o] {
             PlannedAction a; a.id = aid; a.title = s(actionTitle(q(aid))); a.risk = riskOf(q(aid));
             for (auto &p : m_agent->diagnosis().plan) if (p.id == aid) { Risk r = std::max(a.risk, p.risk); a = p; a.risk = r; }
             if (a.risk >= Risk::Harmlos && !a.manual) {
-                if (!askApproval(a, a.why + "\nRisiko: " + riskName(a.risk))) { log(LogKind::Entscheidung, "Abgelehnt: " + a.title); return; }
+                stepUpdate(aid, a.title, 1, "wartet auf Freigabe");
+                if (!askApproval(a, a.why + "\nRisiko: " + riskName(a.risk))) { log(LogKind::Entscheidung, "Abgelehnt: " + a.title); stepUpdate(aid, a.title, 5, "abgelehnt"); return; }
             }
+            stepUpdate(aid, a.title, 1, "läuft");
             auto r = m_agent->execute(aid, o, callbacks(), &m_cancel);
+            stepUpdate(aid, a.title, r.ok ? 2 : r.manual ? 6 : (r.executed ? 3 : 4), r.message);
             QMetaObject::invokeMethod(this, [this, r] { setResult(q(r.message)); }, Qt::QueuedConnection);
         });
     }
 
     Q_INVOKABLE void autoRun() {
-        if (!current()) return;
+        if (!current() || m_busy) return;
         RunOptions o = options();
         UsbDevice dev = *current();
+        beginRun("Automatische Reparatur", {});
         start("Automatische Reparatur", [this, o, dev] {
             if (m_agent->diagnosis().hypotheses.empty()) m_agent->diagnose(dev, callbacks(), &m_cancel, true);
             auto res = m_agent->autoRun(o, callbacks(), &m_cancel);
@@ -263,6 +273,7 @@ signals:
     void chatChanged();
     void optionsChanged();
     void lastResultChanged();
+    void runChanged();
 
 private:
     const UsbDevice *current() const { return m_selected >= 0 && size_t(m_selected) < m_devs.size() ? &m_devs[size_t(m_selected)] : nullptr; }
@@ -293,10 +304,37 @@ private:
             fn();
             QMetaObject::invokeMethod(this, [this] {
                 m_busy = false; m_task.clear(); m_progress = 100;
+                if (m_runActive) {
+                    m_runActive = false;
+                    for (auto &v : m_runSteps) { auto m = v.toMap(); if (m["state"].toInt() == 0) { m["state"] = 4; m["info"] = "nicht mehr nötig"; v = m; }
+                                                 else if (m["state"].toInt() == 1) { m["state"] = 3; m["info"] = "abgebrochen"; v = m; } }
+                    emit runChanged();
+                }
                 emit busyChanged(); emit progressChanged(); emit lastResultChanged();
                 updateKnowledge();
             }, Qt::QueuedConnection);
         });
+    }
+
+    void beginRun(const QString &title, const QVariantList &steps) {
+        m_runActive = true; m_runTitle = title; m_runSteps = steps;
+        m_runStarted = double(QDateTime::currentMSecsSinceEpoch());
+        m_runDevice = current() ? q(current()->displayName()) : QString();
+        emit runChanged();
+    }
+    // Schritt anlegen oder aktualisieren (thread-sicher über die Ereignisschleife)
+    void stepUpdate(const std::string &id, const std::string &title, int st, const std::string &info) {
+        QMetaObject::invokeMethod(this, [this, id = q(id), title = q(title), st, info = q(info)] {
+            for (auto &v : m_runSteps) {
+                auto m = v.toMap();
+                if (m["id"].toString() != id) continue;
+                if (st == 0 && m["state"].toInt() != 0) return;   // Neuplanung überschreibt keinen laufenden/fertigen Schritt
+                m["state"] = st; m["info"] = info.left(120); m["title"] = title; v = m;
+                emit runChanged(); return;
+            }
+            m_runSteps << QVariantMap{{"id", id}, {"title", title}, {"state", st}, {"info", info.left(120)}};
+            emit runChanged();
+        }, Qt::QueuedConnection);
     }
 
     bool askApproval(const PlannedAction &a, const std::string &details) {
@@ -322,6 +360,7 @@ private:
             QMetaObject::invokeMethod(this, [this, p, txt = q(t)] { if (p >= 0) m_progress = p; m_progressText = txt; emit progressChanged(); }, Qt::QueuedConnection);
         };
         cb.approve = [this](const PlannedAction &a, const std::string &d) { return askApproval(a, d); };
+        cb.step = [this](const std::string &id, const std::string &title, int st, const std::string &info) { stepUpdate(id, title, st, info); };
         cb.diagnosisChanged = [this](const Diagnosis &d, const DeviceFacts &f) {
             QVariantMap m = toMap(d, f);
             QMetaObject::invokeMethod(this, [this, m] { m_diag = m; emit diagnosisChanged(); }, Qt::QueuedConnection);
@@ -411,6 +450,10 @@ private:
     QVariantList m_devList, m_monitor, m_chat;
     QVariantMap m_diag, m_approval, m_knowledge;
     int m_selected = -1;
+    bool m_runActive = false;
+    QString m_runTitle, m_runDevice;
+    QVariantList m_runSteps;
+    double m_runStarted = 0;
     int m_modelAccuracy = 0;
     bool m_busy = false, m_empty = false;
     double m_progress = 0;

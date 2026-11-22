@@ -18,6 +18,9 @@ struct AgentCallbacks {
     // Freigabe für einen Schritt (Titel, Risiko, Erklärung). false = abgelehnt.
     std::function<bool(const PlannedAction &, const std::string &details)> approve;
     std::function<void(const Diagnosis &, const DeviceFacts &)> diagnosisChanged;
+    // Ablauf-Schritte für die Fortschrittsanzeige: Zustand 0 geplant, 1 läuft, 2 erledigt, 3 fehlgeschlagen,
+    // 4 übersprungen, 5 abgelehnt, 6 Hinweis
+    std::function<void(const std::string &id, const std::string &title, int state, const std::string &info)> step;
 };
 
 struct RunOptions {
@@ -277,6 +280,8 @@ public:
         std::vector<std::string> tried;
         auto L = [&](LogKind k, const std::string &s) { if (cb.log) cb.log(k, s); };
         L(LogKind::Entscheidung, "Automatischer Ablauf gestartet: zuerst sichern, dann von harmlos nach riskant");
+        auto S = [&](const std::string &id, const std::string &title, int st, const std::string &info) { if (cb.step) cb.step(id, title, st, info); };
+        for (auto &a : diag_.plan) S(a.id, a.title, 0, a.manual ? "Hinweis" : (a.risk >= Risk::Harmlos ? "fragt vorher nach" : "wartet"));
         for (int round = 0; round < 15; ++round) {
             if (cancel && cancel->cancelled()) break;
             if (diag_.top() && diag_.top()->id == "healthy" && round > 0) { L(LogKind::Entscheidung, "Stick ist wieder in Ordnung – Ablauf beendet"); break; }
@@ -288,16 +293,22 @@ public:
             if (!next) { L(LogKind::Entscheidung, "Keine weiteren sinnvollen Schritte"); break; }
             PlannedAction a = *next;
             tried.push_back(a.id);
-            if (a.manual) { StepOutcome o; o.action = a.id; o.manual = true; o.message = guidance(a.id); L(LogKind::Info, "Hinweis: " + o.message); out.push_back(o); continue; }
-            if (a.needsTarget && opt.targetDir.empty() && a.id != "image") { L(LogKind::Entscheidung, "Übersprungen (kein Zielordner gewählt): " + a.title); continue; }
-            if (a.needsImage && !facts_.imageAvailable && !opt.stickIsEmpty) { L(LogKind::Entscheidung, "Übersprungen (erst Abbild nötig): " + a.title); continue; }
+            for (auto &p : diag_.plan) S(p.id, p.title, 0, p.manual ? "Hinweis" : (p.risk >= Risk::Harmlos ? "fragt vorher nach" : "wartet"));  // neu geplante Schritte nachtragen
+            if (a.manual) { StepOutcome o; o.action = a.id; o.manual = true; o.message = guidance(a.id); L(LogKind::Info, "Hinweis: " + o.message); S(a.id, a.title, 6, "Hinweis im Monitor"); out.push_back(o); continue; }
+            if (a.needsTarget && opt.targetDir.empty() && a.id != "image") { L(LogKind::Entscheidung, "Übersprungen (kein Zielordner gewählt): " + a.title); S(a.id, a.title, 4, "kein Zielordner"); continue; }
+            if (a.needsImage && !facts_.imageAvailable && !opt.stickIsEmpty) { L(LogKind::Entscheidung, "Übersprungen (erst Abbild nötig): " + a.title); S(a.id, a.title, 4, "erst Abbild nötig"); continue; }
             if (a.risk >= Risk::Harmlos && cb.approve) {
+                S(a.id, a.title, 1, "wartet auf Freigabe");
                 std::string details = a.why + "\nRisiko: " + riskName(a.risk);
                 if (a.learnedTries) details += fmt("\nErfahrung bei ähnlichen Sticks: %d von %d erfolgreich", int(a.learnedRate * a.learnedTries + 0.5), a.learnedTries);
-                if (!cb.approve(a, details)) { L(LogKind::Entscheidung, "Vom Benutzer abgelehnt: " + a.title); continue; }
+                if (!cb.approve(a, details)) { L(LogKind::Entscheidung, "Vom Benutzer abgelehnt: " + a.title); S(a.id, a.title, 5, "abgelehnt"); continue; }
                 L(LogKind::Entscheidung, "Freigegeben: " + a.title);
             }
-            out.push_back(execute(a.id, opt, cb, cancel));
+            S(a.id, a.title, 1, "läuft");
+            if (cb.progress) cb.progress(0, a.title);
+            StepOutcome o = execute(a.id, opt, cb, cancel);
+            S(a.id, a.title, o.ok ? 2 : (o.executed ? 3 : 4), o.message);
+            out.push_back(o);
         }
         return out;
     }

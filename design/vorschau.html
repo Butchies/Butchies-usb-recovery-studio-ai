@@ -89,6 +89,25 @@ body { font-family: Inter, "Segoe UI", sans-serif; font-size: 14px; color: var(-
 .splash { position: fixed; inset: 0; background: linear-gradient(#1e3a8a, #2563eb); display: grid; place-items: center; color: #fff; text-align: center; }
 .splash img { width: 150px; } .splash h1 { font-size: 34px; margin-top: 18px; } .splash h1 span { color: #93c5fd; } .splash p { color: #dbeafe; font-size: 15px; margin-top: 10px; }
 .splash .lb { width: 240px; height: 4px; border-radius: 2px; background: #ffffff33; margin: 20px auto 0; } .splash .lb div { width: 65%; height: 100%; background: #fff; border-radius: 2px; }
+.run { flex: none; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 20px 22px; box-shadow: 0 4px 0 rgba(11,27,63,.04); }
+.run .rh { display: flex; align-items: center; gap: 12px; }
+.spin { width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(var(--sky), var(--blue)); display: grid; place-items: center; }
+.spin img { width: 18px; filter: brightness(0) invert(1); }
+.run .rh b { font-size: 16px; color: var(--strong); display: block; } .run .rh small { color: var(--muted); font-size: 12px; }
+.run .pct { margin-left: auto; font-size: 26px; font-weight: 700; color: var(--blue2); }
+.bigbar { height: 14px; border-radius: 7px; background: #e8eef9; margin: 14px 0 8px; overflow: hidden; position: relative; }
+.bigbar div { height: 100%; border-radius: 7px; background: linear-gradient(90deg, var(--sky), var(--blue)); }
+.bigbar i { position: absolute; top: 0; bottom: 0; width: 80px; background: linear-gradient(90deg, transparent, #ffffff66, transparent); left: 45%; }
+.now { display: flex; gap: 8px; align-items: center; color: var(--text); font-size: 13px; }
+.now b { color: var(--strong); }
+.tl { display: flex; align-items: flex-start; margin-top: 16px; }
+.tl .st { width: 128px; text-align: center; font-size: 12px; }
+.tl .st i { display: grid; place-items: center; margin: 0 auto 6px; width: 30px; height: 30px; border-radius: 15px; font-style: normal; font-weight: 700; font-size: 13px; background: #eef2f7; color: #64748b; }
+.tl .st.ok i { background: var(--good); color: #fff; } .tl .st.cur i { background: var(--blue2); color: #fff; box-shadow: 0 0 0 4px #dbeafe; }
+.tl .st.wait i { background: var(--warnSoft); color: #b45309; }
+.tl .st b { display: block; color: var(--strong); font-size: 12px; line-height: 1.3; } .tl .st span { color: var(--muted); }
+.tl .st.cur b { color: var(--blue2); } .tl .st .mini { height: 4px; border-radius: 2px; background: #e8eef9; margin: 5px 14px 0; } .tl .st .mini div { height: 100%; width: 74%; background: var(--blue2); border-radius: 2px; }
+.tl .ln { flex: 1; height: 2px; background: #e3ebf7; margin-top: 15px; } .tl .ln.ok { background: var(--good); }
 .page { display: none; } .page.on { display: flex; }
 </style>
 </head>
@@ -199,8 +218,22 @@ body { font-family: Inter, "Segoe UI", sans-serif; font-size: 14px; color: var(-
 
   <!-- 4 Monitor -->
   <div class="content page" id="p4">
+    <div class="run">
+      <div class="rh"><div class="spin"><img src="../native/icons/tool-white.svg"></div>
+        <div><b>Automatische Reparatur läuft</b><small>Schritt 3 von 5 · läuft seit 4:12 min · Intenso Speed Line</small></div>
+        <div class="pct">58 %</div><span class="btn d" style="margin-left:14px"><img src="../native/icons/x-red.svg">Abbrechen</span></div>
+      <div class="bigbar"><div style="width:58%"></div><i></i></div>
+      <div class="now"><b>Jetzt:</b> Signatursuche – 412 Dateien gefunden (jpg 318, mp4 41, pdf 22, docx 31) · 1,2 GB · bei 47,6 von 64,0 GB</div>
+      <div class="tl">
+        <div class="st ok"><i>✓</i><b>Rettungsabbild</b><span>64,0 GB gesichert</span></div><div class="ln ok"></div>
+        <div class="st ok"><i>✓</i><b>Dateien retten</b><span>1.284 Dateien</span></div><div class="ln ok"></div>
+        <div class="st cur"><i>3</i><b>Signatursuche</b><span>74 %</span><div class="mini"><div></div></div></div><div class="ln"></div>
+        <div class="st"><i>4</i><b>Bootsektor wieder&shy;herstellen</b><span>fragt vorher nach</span></div><div class="ln"></div>
+        <div class="st"><i>5</i><b>Prüfen &amp; lernen</b><span>wartet</span></div>
+      </div>
+    </div>
     <div class="row2"><div class="chips"><span class="chip on">Alle</span><span class="chip">Messung</span><span class="chip">Hypothese</span><span class="chip">Entscheidung</span><span class="chip">Aktion</span><span class="chip">Prüfung</span><span class="chip">Lernen</span><span class="chip">Warnung</span></div><span style="flex:1"></span><span class="btn"><img src="../native/icons/x-blue.svg">Leeren</span></div>
-    <div class="card" style="flex:1;padding:16px" id="monitor"></div>
+    <div class="card" style="flex:1;padding:16px;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end" id="monitor"></div>
   </div>
 </div>
 

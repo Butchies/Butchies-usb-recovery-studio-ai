@@ -357,13 +357,13 @@ ApplicationWindow {
                         Label { text: window.pages[window.page].sub; color: theme.muted; font.pixelSize: 13 } }
                     Item { Layout.fillWidth: true }
                     ColumnLayout {
-                        visible: controller.busy; Layout.preferredWidth: 380; spacing: 4
+                        visible: controller.busy && !(window.page === 4 && runCard.visible); Layout.preferredWidth: 380; spacing: 4
                         RowLayout { Label { text: controller.currentTask; font.bold: true; color: theme.strong; elide: Text.ElideRight; Layout.fillWidth: true }
                             Label { text: Math.round(controller.progress) + " %"; font.bold: true; color: theme.blue2 } }
                         Bar { Layout.fillWidth: true; value: controller.progress }
                         Label { text: controller.progressText; color: theme.muted; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true } }
-                    ActionButton { visible: controller.busy; text: "Abbrechen"; iconName: "x"; danger: true; onClicked: controller.cancel() }
-                    Rectangle { visible: !controller.busy; radius: 999; color: theme.soft; implicitHeight: 30; implicitWidth: aiRow.implicitWidth + 24
+                    ActionButton { visible: controller.busy && !(window.page === 4 && runCard.visible); text: "Abbrechen"; iconName: "x"; danger: true; onClicked: controller.cancel() }
+                    Rectangle { visible: !controller.busy || (window.page === 4 && runCard.visible); radius: 999; color: theme.soft; implicitHeight: 30; implicitWidth: aiRow.implicitWidth + 24
                         RowLayout { id: aiRow; anchors.centerIn: parent; spacing: 8
                             Rectangle { width: 8; height: 8; radius: 4; color: theme.good
                                 SequentialAnimation on opacity { loops: Animation.Infinite; NumberAnimation { to: 0.3; duration: 900 } NumberAnimation { to: 1; duration: 900 } } }
@@ -662,7 +662,100 @@ ApplicationWindow {
                 ColumnLayout {
                     spacing: 12
                     Layout.minimumWidth: 0; Layout.preferredWidth: 0
-                    RowLayout { Layout.leftMargin: 22; Layout.rightMargin: 22; Layout.topMargin: 18; spacing: 8
+
+                    // ---- Fortschritt des laufenden Ablaufs
+                    Rectangle {
+                        id: runCard
+                        readonly property var run: controller.run || ({})
+                        readonly property var steps: run.steps || []
+                        readonly property int total: steps.length
+                        readonly property int done: { var n = 0; for (var i = 0; i < steps.length; ++i) if (steps[i].state >= 2) ++n; return n }
+                        readonly property int currentIndex: { for (var i = 0; i < steps.length; ++i) if (steps[i].state === 1) return i; return -1 }
+                        readonly property real overall: !controller.busy && total > 0 ? 100
+                            : total > 0 ? Math.min(100, (done + (currentIndex >= 0 ? controller.progress / 100 : 0)) / total * 100) : controller.progress
+                        property double now: Date.now()
+                        function elapsed() {
+                            if (!run.started) return ""
+                            var s = Math.max(0, Math.floor((now - run.started) / 1000))
+                            return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2) + " min"
+                        }
+                        Timer { interval: 1000; repeat: true; running: controller.busy; onTriggered: runCard.now = Date.now() }
+                        visible: controller.busy || total > 0
+                        Layout.fillWidth: true; Layout.leftMargin: 22; Layout.rightMargin: 22; Layout.topMargin: 18
+                        radius: 18; color: "#ffffff"; border.color: theme.line
+                        implicitHeight: runCol.implicitHeight + 40
+                        ColumnLayout {
+                            id: runCol
+                            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 20; spacing: 10
+                            RowLayout { spacing: 12
+                                Rectangle { width: 36; height: 36; radius: 12
+                                    gradient: Gradient { GradientStop { position: 0; color: controller.busy ? theme.sky : "#22c55e" } GradientStop { position: 1; color: controller.busy ? theme.blue : theme.good } }
+                                    Image { anchors.centerIn: parent; source: window.icon(controller.busy ? "tool" : "check", "white"); sourceSize: Qt.size(18, 18)
+                                        RotationAnimation on rotation { running: controller.busy; loops: Animation.Infinite; from: -12; to: 12; duration: 700; easing.type: Easing.InOutSine }
+                                    } }
+                                ColumnLayout { spacing: 1; Layout.fillWidth: true
+                                    Label { text: (runCard.run.title || controller.currentTask || "Vorgang") + (controller.busy ? " läuft" : " abgeschlossen"); font.pixelSize: 16; font.bold: true; color: theme.strong }
+                                    Label { color: theme.muted; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true
+                                        text: (runCard.total > 0 ? ("Schritt " + Math.min(runCard.total, (runCard.currentIndex >= 0 ? runCard.currentIndex + 1 : runCard.done)) + " von " + runCard.total + " · ") : "")
+                                              + (controller.busy ? "läuft seit " : "Dauer ") + runCard.elapsed() + (runCard.run.device ? " · " + runCard.run.device : "") } }
+                                Label { text: Math.round(runCard.overall) + " %"; font.pixelSize: 26; font.bold: true; color: controller.busy ? theme.blue2 : theme.good }
+                                ActionButton { visible: controller.busy; text: "Abbrechen"; iconName: "x"; danger: true; onClicked: controller.cancel() }
+                                ActionButton { visible: !controller.busy; text: "Ausblenden"; iconName: "x"; onClicked: controller.clearRun() }
+                            }
+                            Rectangle {   // große Leiste
+                                Layout.fillWidth: true; implicitHeight: 14; radius: 7; color: "#e8eef9"; clip: true
+                                Rectangle {
+                                    id: bigFill
+                                    width: parent.width * Math.max(0, Math.min(1, runCard.overall / 100)); height: parent.height; radius: 7
+                                    gradient: Gradient { orientation: Gradient.Horizontal
+                                        GradientStop { position: 0; color: controller.busy ? theme.sky : "#4ade80" } GradientStop { position: 1; color: controller.busy ? theme.blue : theme.good } }
+                                    Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
+                                    Rectangle {   // Glanz, der durchläuft
+                                        visible: controller.busy; width: 80; height: parent.height; opacity: 0.45
+                                        gradient: Gradient { orientation: Gradient.Horizontal
+                                            GradientStop { position: 0; color: "#00ffffff" } GradientStop { position: 0.5; color: "#ffffffff" } GradientStop { position: 1; color: "#00ffffff" } }
+                                        NumberAnimation on x { running: controller.busy; loops: Animation.Infinite; from: -80; to: bigFill.width; duration: 1600 }
+                                    }
+                                }
+                            }
+                            RowLayout { spacing: 6
+                                Label { text: controller.busy ? "Jetzt:" : "Ergebnis:"; font.bold: true; color: theme.strong }
+                                Label { text: controller.busy ? controller.progressText : controller.lastResult.split("\n")[0]; color: theme.text; elide: Text.ElideRight; Layout.fillWidth: true } }
+                            RowLayout {   // Zeitleiste der Schritte
+                                visible: runCard.total > 0; Layout.fillWidth: true; Layout.topMargin: 6; spacing: 0
+                                Repeater {
+                                    model: runCard.steps
+                                    delegate: Item {
+                                        id: stepItem
+                                        readonly property int st: modelData.state
+                                        Layout.fillWidth: true; Layout.preferredWidth: 1
+                                        implicitHeight: stepCol.implicitHeight
+                                        Rectangle {   // Verbindungslinie zum vorigen Schritt
+                                            visible: index > 0; height: 2; y: 15; x: -width / 2; width: parent.width - 34
+                                            color: stepItem.st >= 2 || stepItem.st === 1 ? theme.good : theme.line
+                                        }
+                                        ColumnLayout {
+                                            id: stepCol; width: parent.width; spacing: 4
+                                            Rectangle { Layout.alignment: Qt.AlignHCenter; width: 30; height: 30; radius: 15
+                                                color: stepItem.st === 2 ? theme.good : stepItem.st === 1 ? theme.blue2 : stepItem.st === 3 ? theme.bad : stepItem.st === 5 ? theme.warn : stepItem.st === 6 ? theme.soft : "#eef2f7"
+                                                border.color: "#dbeafe"; border.width: stepItem.st === 1 ? 4 : 0
+                                                Label { anchors.centerIn: parent; font.bold: true; font.pixelSize: 13
+                                                    text: stepItem.st === 2 ? "✓" : stepItem.st === 3 ? "!" : stepItem.st === 4 ? "–" : stepItem.st === 5 ? "✕" : stepItem.st === 6 ? "i" : String(index + 1)
+                                                    color: stepItem.st === 0 || stepItem.st === 4 ? "#64748b" : stepItem.st === 6 ? theme.blue : "#ffffff" } }
+                                            Label { Layout.fillWidth: true; Layout.leftMargin: 4; Layout.rightMargin: 4; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight
+                                                text: modelData.title; font.pixelSize: 12; font.bold: true; color: stepItem.st === 1 ? theme.blue2 : theme.strong }
+                                            Label { Layout.fillWidth: true; Layout.leftMargin: 4; Layout.rightMargin: 4; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight
+                                                text: stepItem.st === 1 && modelData.info === "läuft" ? Math.round(controller.progress) + " %" : modelData.info
+                                                font.pixelSize: 11; color: stepItem.st === 3 ? "#b91c1c" : theme.muted }
+                                            Bar { visible: stepItem.st === 1 && modelData.info === "läuft"; Layout.fillWidth: true; Layout.leftMargin: 16; Layout.rightMargin: 16; implicitHeight: 4; value: controller.progress }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout { Layout.leftMargin: 22; Layout.rightMargin: 22; Layout.topMargin: runCard.visible ? 0 : 18; spacing: 8
                         Repeater { model: ["Alle", "Messung", "Hypothese", "Entscheidung", "Aktion", "Prüfung", "Lernen", "Warnung"]
                             delegate: Rectangle { radius: 999; implicitHeight: 30; implicitWidth: fl.implicitWidth + 24
                                 color: monList.filter === modelData ? theme.blue2 : "#ffffff"; border.color: monList.filter === modelData ? theme.blue2 : "#cfdcf5"
