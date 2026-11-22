@@ -20,6 +20,7 @@
 #include <QJsonArray>
 #include <QIcon>
 #include <QQuickWindow>
+#include <QQuickStyle>
 #include <QTimer>
 #include <QThread>
 #include <QTime>
@@ -424,6 +425,7 @@ private:
 };
 
 int main(int argc, char *argv[]) {
+    QQuickStyle::setStyle("Basic");   // eigenes Blau/Weiß-Design statt Windows-Stil
     QGuiApplication app(argc, argv);
     app.setOrganizationName("Butchies");
     app.setApplicationName("Butchies USB Recovery Studio AI");

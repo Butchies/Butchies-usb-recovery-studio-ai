@@ -344,6 +344,7 @@ ApplicationWindow {
         // ------------------------------------------------ Mitte
         ColumnLayout {
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: 0
+            Layout.preferredWidth: 0; Layout.minimumWidth: 480
 
             Rectangle {   // Kopfzeile
                 Layout.fillWidth: true; implicitHeight: 76; color: "#ffffff"
@@ -761,7 +762,7 @@ ApplicationWindow {
 
         // ------------------------------------------------ KI-Assistent
         Rectangle {
-            Layout.fillHeight: true; Layout.preferredWidth: 350; color: "#ffffff"
+            Layout.fillHeight: true; Layout.preferredWidth: 350; Layout.minimumWidth: 300; color: "#ffffff"
             Rectangle { width: 1; height: parent.height; color: theme.line }
             ColumnLayout {
                 anchors.fill: parent; spacing: 0
