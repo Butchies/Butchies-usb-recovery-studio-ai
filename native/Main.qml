@@ -808,7 +808,8 @@ ApplicationWindow {
                     }
                     Rectangle { Layout.fillWidth: true; radius: 14; color: theme.softer; border.color: "#cfdcf5"; implicitHeight: 50
                         RowLayout { anchors.fill: parent; anchors.margins: 5; spacing: 6
-                            TextField { id: askField; Layout.fillWidth: true; placeholderText: "Frage stellen …"; background: Item {}; onAccepted: { controller.ask(text); text = "" } }
+                            TextField { id: askField; Layout.fillWidth: true; placeholderText: "Frage stellen …"; onAccepted: { controller.ask(text); text = "" }
+                                background: Item {} }
                             ActionButton { text: "Senden"; primary: true; implicitHeight: 38; onClicked: { controller.ask(askField.text); askField.text = "" } } } }
                 }
             }
